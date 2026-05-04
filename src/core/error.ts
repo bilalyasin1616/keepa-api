@@ -49,3 +49,16 @@ export class AuthenticationError extends APIError {
     this.name = 'AuthenticationError';
   }
 }
+
+export class NetworkError extends KeepaError {
+  readonly context: string;
+  override readonly cause: unknown;
+
+  constructor(context: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`Keepa ${context} network error: ${detail}`);
+    this.name = 'NetworkError';
+    this.context = context;
+    this.cause = cause;
+  }
+}

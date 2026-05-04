@@ -4,6 +4,7 @@ import {
   APIError,
   RateLimitError,
   AuthenticationError,
+  NetworkError,
 } from '../../src/core/error.js';
 
 describe('KeepaError', () => {
@@ -66,5 +67,25 @@ describe('APIError.from', () => {
     expect(err).not.toBeInstanceOf(AuthenticationError);
     expect(err.status).toBe(503);
     expect(err.body).toBe('down');
+  });
+});
+
+describe('NetworkError', () => {
+  it('extends KeepaError and surfaces the underlying cause', () => {
+    const cause = new TypeError('ECONNREFUSED');
+    const err = new NetworkError('product API', cause);
+    expect(err).toBeInstanceOf(KeepaError);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(err).not.toBeInstanceOf(APIError);
+    expect(err.context).toBe('product API');
+    expect(err.cause).toBe(cause);
+    expect(err.message).toMatch(/network error.*ECONNREFUSED/);
+    expect(err.name).toBe('NetworkError');
+  });
+
+  it('handles non-Error causes by stringifying them', () => {
+    const err = new NetworkError('product API', 'raw string');
+    expect(err.cause).toBe('raw string');
+    expect(err.message).toMatch(/network error.*raw string/);
   });
 });

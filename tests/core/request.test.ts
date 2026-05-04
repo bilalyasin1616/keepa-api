@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildUrl, request } from '../../src/core/request.js';
-import { APIError, RateLimitError, AuthenticationError } from '../../src/core/error.js';
+import {
+  APIError,
+  RateLimitError,
+  AuthenticationError,
+  NetworkError,
+  KeepaError,
+} from '../../src/core/error.js';
 
 describe('buildUrl', () => {
   const base = 'https://api.keepa.com';
@@ -83,6 +89,23 @@ describe('request', () => {
       expect(err).toBeInstanceOf(APIError);
       expect((err as APIError).status).toBe(500);
       expect((err as APIError).body).toBe('server boom');
+    }
+  });
+
+  it('wraps a fetch transport failure (DNS/ECONNREFUSED/abort) in NetworkError', async () => {
+    const cause = new TypeError('fetch failed');
+    const fakeFetch = vi.fn().mockRejectedValue(cause);
+    try {
+      await request(
+        { ...base, fetch: fakeFetch },
+        { path: '/product', context: 'product API' },
+      );
+      throw new Error('expected request to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(NetworkError);
+      expect(err).toBeInstanceOf(KeepaError);
+      expect((err as NetworkError).cause).toBe(cause);
+      expect((err as NetworkError).context).toBe('product API');
     }
   });
 });

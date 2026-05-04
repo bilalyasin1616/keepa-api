@@ -5,6 +5,7 @@ export {
   APIError,
   RateLimitError,
   AuthenticationError,
+  NetworkError,
 } from './core/error.js';
 
 export { APIResource } from './core/resource.js';

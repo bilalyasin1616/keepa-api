@@ -62,7 +62,7 @@ describe('normalizeAsins', () => {
     expect(() => normalizeAsins(['bad1', 'bad2'])).toThrow(/BAD1.*BAD2|BAD2.*BAD1/);
   });
 
-  it('throws on empty input list (caller should guard)', () => {
+  it('returns [] for empty input — Products.list guards asins.length === 0 separately', () => {
     expect(() => normalizeAsins([])).not.toThrow();
     expect(normalizeAsins([])).toEqual([]);
   });

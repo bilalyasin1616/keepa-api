@@ -21,7 +21,12 @@ export class Keepa {
   readonly products: Products;
 
   constructor(options: ClientOptions = {}) {
-    const apiKey = options.apiKey || process.env.KEEPA_API_KEY;
+    // `process` is undefined in browsers / Cloudflare Workers / edge runtimes — guard it
+    // so the constructor throws our friendly "Missing Keepa API key" message instead of a
+    // raw ReferenceError on those targets.
+    const envApiKey =
+      typeof process !== 'undefined' ? process.env?.KEEPA_API_KEY : undefined;
+    const apiKey = options.apiKey || envApiKey;
     if (!apiKey) {
       throw new Error(
         'Missing Keepa API key. Pass it as `new Keepa({ apiKey })` or set KEEPA_API_KEY in your environment.',

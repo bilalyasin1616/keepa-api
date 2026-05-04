@@ -7,6 +7,7 @@ import {
   isFoundProduct,
   type KeepaProduct,
 } from '../../src/resources/products.js';
+import type { Marketplace } from '../../src/lib/marketplace.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -96,7 +97,9 @@ describe('Products.list', () => {
     const fakeFetch = vi.fn();
     const client = makeClient(fakeFetch);
     await expect(
-      client.products.list({ asins: ['B07XYZ1234'], marketplace: 'XX' }),
+      // Cast required: 'XX' isn't in the Marketplace literal union, but resolveDomainId
+      // still defends against runtime-bad input (e.g. user form data).
+      client.products.list({ asins: ['B07XYZ1234'], marketplace: 'XX' as Marketplace }),
     ).rejects.toThrow(/Invalid marketplace "XX"/);
     expect(fakeFetch).not.toHaveBeenCalled();
   });
@@ -154,6 +157,15 @@ describe('extractBsr', () => {
   it('returns the most recent rank (last element of [ts, rank, ts, rank, ...])', () => {
     expect(extractBsr({ '1': [1000, 50, 2000, 42] }, 1)).toBe(42);
   });
+
+  it('skips Keepa -1 sentinel and returns the most recent real rank', () => {
+    expect(extractBsr({ '1': [1000, 50, 2000, -1] }, 1)).toBe(50);
+    expect(extractBsr({ '1': [1000, 50, 2000, -1, 3000, -1] }, 1)).toBe(50);
+  });
+
+  it('returns null when every rank is the -1 sentinel', () => {
+    expect(extractBsr({ '1': [1000, -1, 2000, -1] }, 1)).toBeNull();
+  });
 });
 
 describe('isFoundProduct', () => {
@@ -179,9 +191,9 @@ describe('extractImageUrl', () => {
     expect(extractImageUrl('')).toBeNull();
   });
 
-  it('builds a full Amazon image URL from the first image in the CSV', () => {
+  it('builds a region-neutral Amazon image URL from the first image in the CSV', () => {
     expect(extractImageUrl('abc123.jpg,xyz.jpg')).toBe(
-      'https://images-na.ssl-images-amazon.com/images/I/abc123.jpg',
+      'https://m.media-amazon.com/images/I/abc123.jpg',
     );
   });
 });

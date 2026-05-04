@@ -31,7 +31,7 @@ After this, edits in `keepa-api/src/` only need `npm run build` — the consumer
 ### From GitHub (no npm publish needed)
 
 ```bash
-npm install github:<your-username>/keepa-api#feature/keepa-products-package
+npm install github:bilalyasin1616/keepa-api#feature/keepa-products-package
 ```
 
 (Replace the branch with `main` once the work is merged.)
@@ -143,7 +143,13 @@ resolveDomainId(undefined); // 1 (defaults to US)
 All errors thrown by API calls extend `KeepaError`. Catch the specific subclasses for status-aware handling:
 
 ```ts
-import { RateLimitError, AuthenticationError, APIError, KeepaError } from 'keepa-api';
+import {
+  RateLimitError,
+  AuthenticationError,
+  APIError,
+  NetworkError,
+  KeepaError,
+} from 'keepa-api';
 
 try {
   await keepa.products.list({ asins: ['B00MNV8E0C'] });
@@ -151,10 +157,19 @@ try {
   if (err instanceof RateLimitError) /* 429 */;
   else if (err instanceof AuthenticationError) /* 401 — bad API key */;
   else if (err instanceof APIError) /* 4xx/5xx — err.status, err.body */;
+  else if (err instanceof NetworkError) /* DNS/ECONNREFUSED/abort — err.cause has the original */;
   else if (err instanceof KeepaError) /* something else from this SDK */;
   else throw err;
 }
 ```
+
+### API key handling
+
+Keepa's REST API requires the key as a `?key=...` query parameter — that's their contract, not a choice we made. Practical implications:
+
+- **Server-side proxy / access logs** will record full URLs (key included). Configure log scrubbing if you can't trust the layer.
+- **Don't run this in the browser.** A client-side request would expose your key in DevTools' Network tab and to any browser extension or middlebox.
+- The `NetworkError.body` and `APIError.body` fields capture Keepa's response body. Keepa doesn't echo your key in error bodies, but if you log them to a customer-facing surface, sanity-check the contents first.
 
 ## Scripts
 
