@@ -1,6 +1,6 @@
 import { request } from './core/request.js';
 import type { RequestArgs, RequestConfig } from './core/request.js';
-import { Products } from './resources/products.js';
+import { Products } from './resources/products/products.js';
 
 export interface ClientOptions {
   /** Keepa API key. Falls back to `process.env.KEEPA_API_KEY`. */

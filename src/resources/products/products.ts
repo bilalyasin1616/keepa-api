@@ -1,54 +1,18 @@
-import { APIResource } from '../core/resource.js';
-import { resolveDomainId, type Marketplace } from '../lib/marketplace.js';
-import { normalizeAsins } from '../lib/asin.js';
-
-const PRODUCT_PATH = '/product';
-const PRODUCT_API_CONTEXT = 'product API';
-const DEFAULT_DAYS = 1;
-// Region-neutral Amazon image CDN. Serves the same images globally regardless of marketplace.
-const AMAZON_IMAGE_BASE = 'https://m.media-amazon.com/images/I';
-// Keepa stores `-1` in salesRanks/price arrays to indicate "no data captured at that timestamp".
-const KEEPA_NO_DATA_SENTINEL = -1;
-
-export interface ProductListParams {
-  asins: string[];
-  /** Marketplace code (case-insensitive at runtime). Defaults to 'US'. */
-  marketplace?: Marketplace;
-  /** Days of price history to include. Defaults to 1. */
-  days?: number;
-}
-
-export interface KeepaCategoryNode {
-  catId: number;
-  name: string;
-}
-
-export interface KeepaVariationAttribute {
-  dimension: string;
-  value: string;
-}
-
-export interface KeepaVariation {
-  asin: string;
-  attributes?: KeepaVariationAttribute[];
-}
-
-export interface KeepaProduct {
-  asin: string;
-  title?: string;
-  description?: string;
-  parentAsin?: string;
-  categoryTree?: KeepaCategoryNode[];
-  rootCategory?: number;
-  salesRanks?: Record<string, number[]>;
-  imagesCSV?: string;
-  variations?: KeepaVariation[];
-  bulletPoints?: string[];
-}
-
-export interface KeepaProductResponse {
-  products?: KeepaProduct[];
-}
+import { APIResource } from '../../core/resource.js';
+import { resolveDomainId } from '../../lib/marketplace.js';
+import { normalizeAsins } from '../../lib/asin.js';
+import {
+  PRODUCT_PATH,
+  PRODUCT_API_CONTEXT,
+  DEFAULT_DAYS,
+  AMAZON_IMAGE_BASE,
+  KEEPA_NO_DATA_SENTINEL,
+} from './constant.js';
+import type {
+  KeepaProduct,
+  KeepaProductResponse,
+  ProductListParams,
+} from './product.type.js';
 
 export class Products extends APIResource {
   async list(params: ProductListParams): Promise<KeepaProduct[]> {

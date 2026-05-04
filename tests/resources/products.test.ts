@@ -5,8 +5,8 @@ import {
   extractBsr,
   extractImageUrl,
   isFoundProduct,
-  type KeepaProduct,
-} from '../../src/resources/products.js';
+} from '../../src/resources/products/products.js';
+import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
 
