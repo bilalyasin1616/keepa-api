@@ -1,5 +1,6 @@
 import { APIResource } from '../core/resource.js';
 import { resolveDomainId, type Marketplace } from '../lib/marketplace.js';
+import { normalizeAsins } from '../lib/asin.js';
 
 const PRODUCT_PATH = '/product';
 const PRODUCT_API_CONTEXT = 'product API';
@@ -50,18 +51,25 @@ export class Products extends APIResource {
     if (params.asins.length === 0) {
       throw new Error('At least one ASIN is required');
     }
+    const asins = normalizeAsins(params.asins);
     const domain = resolveDomainId(params.marketplace);
     const data = await this._client._request<KeepaProductResponse>({
       path: PRODUCT_PATH,
       query: {
         domain,
-        asin: params.asins,
+        asin: asins,
         days: params.days ?? DEFAULT_DAYS,
       },
       context: PRODUCT_API_CONTEXT,
     });
     return data.products ?? [];
   }
+}
+
+/** Returns true when Keepa returned an actual product record (not just a stub
+ *  for an unknown ASIN). Use as a `.filter()` predicate to drop empty matches. */
+export function isFoundProduct(product: KeepaProduct): boolean {
+  return typeof product.title === 'string' && product.title.length > 0;
 }
 
 /** Extract the most recent BSR from Keepa's `[ts, rank, ts, rank, ...]` salesRanks array. */

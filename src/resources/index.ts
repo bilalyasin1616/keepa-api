@@ -2,6 +2,7 @@ export {
   Products,
   extractBsr,
   extractImageUrl,
+  isFoundProduct,
   type ProductListParams,
   type KeepaProduct,
   type KeepaProductResponse,

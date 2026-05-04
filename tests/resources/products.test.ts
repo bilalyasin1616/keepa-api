@@ -4,6 +4,7 @@ import {
   Products,
   extractBsr,
   extractImageUrl,
+  isFoundProduct,
   type KeepaProduct,
 } from '../../src/resources/products.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
@@ -18,12 +19,12 @@ function makeClient(fetchImpl: typeof globalThis.fetch): Keepa {
 
 describe('Products.list', () => {
   it('builds the correct URL and returns products on success', async () => {
-    const product: KeepaProduct = { asin: 'B07XYZ', title: 'Sample' };
+    const product: KeepaProduct = { asin: 'B07XYZ1234', title: 'Sample' };
     const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [product] }));
     const client = makeClient(fakeFetch);
 
     const result = await client.products.list({
-      asins: ['B07XYZ', 'B07ABC'],
+      asins: ['B07XYZ1234', 'B07ABC5678'],
       marketplace: 'US',
     });
 
@@ -31,14 +32,14 @@ describe('Products.list', () => {
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toBe(
-      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ,B07ABC&days=1',
+      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1',
     );
   });
 
   it('defaults marketplace to US (domain=1)', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [] }));
     const client = makeClient(fakeFetch);
-    await client.products.list({ asins: ['B07XYZ'] });
+    await client.products.list({ asins: ['B07XYZ1234'] });
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toContain('domain=1');
   });
@@ -46,7 +47,7 @@ describe('Products.list', () => {
   it('respects a non-US marketplace', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [] }));
     const client = makeClient(fakeFetch);
-    await client.products.list({ asins: ['B07XYZ'], marketplace: 'DE' });
+    await client.products.list({ asins: ['B07XYZ1234'], marketplace: 'DE' });
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toContain('domain=3');
   });
@@ -55,17 +56,17 @@ describe('Products.list', () => {
     const fakeFetch = vi.fn().mockImplementation(async () => jsonResponse({ products: [] }));
     const client = makeClient(fakeFetch);
 
-    await client.products.list({ asins: ['B07XYZ'] });
+    await client.products.list({ asins: ['B07XYZ1234'] });
     expect(fakeFetch.mock.calls[0]![0] as string).toContain('days=1');
 
-    await client.products.list({ asins: ['B07XYZ'], days: 90 });
+    await client.products.list({ asins: ['B07XYZ1234'], days: 90 });
     expect(fakeFetch.mock.calls[1]![0] as string).toContain('days=90');
   });
 
   it('returns [] when API returns no products field', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({}));
     const client = makeClient(fakeFetch);
-    const result = await client.products.list({ asins: ['B07XYZ'] });
+    const result = await client.products.list({ asins: ['B07XYZ1234'] });
     expect(result).toEqual([]);
   });
 
@@ -76,11 +77,26 @@ describe('Products.list', () => {
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
+  it('throws on malformed ASIN before making any HTTP call', async () => {
+    const fakeFetch = vi.fn();
+    const client = makeClient(fakeFetch);
+    await expect(client.products.list({ asins: ['B07XYZ'] })).rejects.toThrow(/Invalid ASIN/);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+
+  it('normalizes lowercase ASINs to uppercase before sending to Keepa', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [] }));
+    const client = makeClient(fakeFetch);
+    await client.products.list({ asins: ['b00mnv8e0c'], marketplace: 'US' });
+    const url = fakeFetch.mock.calls[0]![0] as string;
+    expect(url).toContain('asin=B00MNV8E0C');
+  });
+
   it('throws when marketplace is invalid', async () => {
     const fakeFetch = vi.fn();
     const client = makeClient(fakeFetch);
     await expect(
-      client.products.list({ asins: ['B07XYZ'], marketplace: 'XX' }),
+      client.products.list({ asins: ['B07XYZ1234'], marketplace: 'XX' }),
     ).rejects.toThrow(/Invalid marketplace "XX"/);
     expect(fakeFetch).not.toHaveBeenCalled();
   });
@@ -88,20 +104,20 @@ describe('Products.list', () => {
   it('surfaces RateLimitError on 429', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(new Response('too many', { status: 429 }));
     const client = makeClient(fakeFetch);
-    await expect(client.products.list({ asins: ['B07XYZ'] })).rejects.toBeInstanceOf(RateLimitError);
+    await expect(client.products.list({ asins: ['B07XYZ1234'] })).rejects.toBeInstanceOf(RateLimitError);
   });
 
   it('surfaces AuthenticationError on 401', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(new Response('bad key', { status: 401 }));
     const client = makeClient(fakeFetch);
-    await expect(client.products.list({ asins: ['B07XYZ'] })).rejects.toBeInstanceOf(AuthenticationError);
+    await expect(client.products.list({ asins: ['B07XYZ1234'] })).rejects.toBeInstanceOf(AuthenticationError);
   });
 
   it('surfaces APIError with status preserved on 500', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(new Response('server boom', { status: 500 }));
     const client = makeClient(fakeFetch);
     try {
-      await client.products.list({ asins: ['B07XYZ'] });
+      await client.products.list({ asins: ['B07XYZ1234'] });
       throw new Error('expected to throw');
     } catch (err) {
       expect(err).toBeInstanceOf(APIError);
@@ -137,6 +153,20 @@ describe('extractBsr', () => {
 
   it('returns the most recent rank (last element of [ts, rank, ts, rank, ...])', () => {
     expect(extractBsr({ '1': [1000, 50, 2000, 42] }, 1)).toBe(42);
+  });
+});
+
+describe('isFoundProduct', () => {
+  it('true when the product has a non-empty title (Keepa returned real data)', () => {
+    expect(isFoundProduct({ asin: 'B00MNV8E0C', title: 'Real Product' })).toBe(true);
+  });
+
+  it('false when title is missing (Keepa stub for unknown ASIN)', () => {
+    expect(isFoundProduct({ asin: '1234567890' })).toBe(false);
+  });
+
+  it('false when title is an empty string', () => {
+    expect(isFoundProduct({ asin: 'B00MNV8E0C', title: '' })).toBe(false);
   });
 });
 
