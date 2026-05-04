@@ -81,26 +81,34 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 | `marketplace` | `'US' \| 'UK' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'AU'` | `'US'` | Case-insensitive. Throws on unknown. |
 | `days` | `number` | `1` | Days of price history to include. |
 
-Returns the array as Keepa returned it. **Note:** Keepa returns one record per requested ASIN even when it has no data — these stub records have most fields null/undefined. Use `isFoundProduct` to filter them out (see below).
+The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
+
+- `images: string[]` — full image URLs (region-neutral CDN). Replaces Keepa's awkward `imagesCSV` string.
+- `bsr: number | null` — most recent real BSR for the product's `rootCategory`. `null` when missing or every history entry is Keepa's `-1` "no data captured" sentinel.
+
+The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `bulletPoints`, …) pass through unchanged.
+
+**Stub records:** Keepa returns one record per requested ASIN even when it has no data — these stubs have `title === undefined`. Filter with `isFoundProduct` (below).
 
 ### Helpers
 
 ```ts
-import { isFoundProduct, extractBsr, extractImageUrl } from 'keepa-api';
+import { isFoundProduct } from 'keepa-api';
 
 const real = products.filter(isFoundProduct);
 
 for (const product of real) {
-  const bsr = extractBsr(product.salesRanks, product.rootCategory);
-  const image = extractImageUrl(product.imagesCSV);
+  console.log(product.bsr);          // already populated by the SDK
+  console.log(product.images[0]);    // already populated by the SDK
 }
 ```
 
 | Helper | Signature | Returns |
 |--------|-----------|---------|
 | `isFoundProduct(p)` | `(p: KeepaProduct) => boolean` | `true` only if Keepa returned real data (`title` is non-empty). |
-| `extractBsr(salesRanks, rootCategory)` | `(Record<string, number[]> \| undefined, number \| undefined) => number \| null` | Most recent BSR from Keepa's `[ts, rank, ...]` history. |
-| `extractImageUrl(imagesCSV)` | `(string \| undefined) => string \| null` | Full Amazon image URL from the first entry in Keepa's CSV. |
+| `parseImagesCsv(csv)` | `(string \| undefined) => string[]` | Build the full image-URL list from a raw Keepa imagesCSV. Used internally to fill `images`; exported for advanced use. |
+| `extractBsr(salesRanks, rootCategory)` | `(Record<string, number[]> \| undefined, number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
+| `extractImageUrl(imagesCSV)` | `(string \| undefined) => string \| null` | Single URL — equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Exported for advanced use. |
 
 ### ASIN validation
 

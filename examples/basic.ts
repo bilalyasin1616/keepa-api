@@ -1,10 +1,10 @@
 import 'dotenv/config';
-import Keepa, { extractBsr, extractImageUrl } from '../src/index.js';
+import Keepa from '../src/index.js';
 
 async function main(): Promise<void> {
   const keepa = new Keepa({ apiKey: process.env.KEEPA_API_KEY });
 
-  // Stable test ASIN — Amazon Basics 9V batteries.
+  // Stable test ASIN — Amazon Basics AA batteries.
   const asin = 'B00MNV8E0C';
   console.log(`Fetching ${asin} from Keepa US...\n`);
 
@@ -24,8 +24,9 @@ async function main(): Promise<void> {
     title: product.title,
     parentAsin: product.parentAsin,
     rootCategory: product.rootCategory,
-    bsr: extractBsr(product.salesRanks, product.rootCategory),
-    image: extractImageUrl(product.imagesCSV),
+    bsr: product.bsr,
+    firstImage: product.images[0] ?? null,
+    imageCount: product.images.length,
     bulletPointsCount: product.bulletPoints?.length ?? 0,
   });
 }

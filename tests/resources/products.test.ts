@@ -5,6 +5,7 @@ import {
   extractBsr,
   extractImageUrl,
   isFoundProduct,
+  parseImagesCsv,
 } from '../../src/resources/products/products.js';
 import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
@@ -19,9 +20,16 @@ function makeClient(fetchImpl: typeof globalThis.fetch): Keepa {
 }
 
 describe('Products.list', () => {
-  it('builds the correct URL and returns products on success', async () => {
-    const product: KeepaProduct = { asin: 'B07XYZ1234', title: 'Sample' };
-    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [product] }));
+  it('builds the correct URL and returns processed products on success', async () => {
+    // Wire shape (what Keepa actually returns) — note imagesCSV, no images/bsr fields.
+    const rawProduct = {
+      asin: 'B07XYZ1234',
+      title: 'Sample',
+      rootCategory: 1,
+      salesRanks: { '1': [1000, 50, 2000, 42] },
+      imagesCSV: 'aaa.jpg,bbb.jpg',
+    };
+    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [rawProduct] }));
     const client = makeClient(fakeFetch);
 
     const result = await client.products.list({
@@ -29,12 +37,36 @@ describe('Products.list', () => {
       marketplace: 'US',
     });
 
-    expect(result).toEqual([product]);
+    // Processed shape: imagesCSV is gone, images[] and bsr are derived for the consumer.
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      asin: 'B07XYZ1234',
+      title: 'Sample',
+      rootCategory: 1,
+      salesRanks: { '1': [1000, 50, 2000, 42] },
+      images: [
+        'https://m.media-amazon.com/images/I/aaa.jpg',
+        'https://m.media-amazon.com/images/I/bbb.jpg',
+      ],
+      bsr: 42,
+    });
+    expect(result[0]).not.toHaveProperty('imagesCSV');
+
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toBe(
       'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1',
     );
+  });
+
+  it('returns images: [] and bsr: null when raw fields are missing', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.images).toEqual([]);
+    expect(product?.bsr).toBeNull();
   });
 
   it('defaults marketplace to US (domain=1)', async () => {
@@ -169,16 +201,42 @@ describe('extractBsr', () => {
 });
 
 describe('isFoundProduct', () => {
+  function processedProduct(overrides: Partial<KeepaProduct>): KeepaProduct {
+    return { asin: 'B00MNV8E0C', images: [], bsr: null, ...overrides };
+  }
+
   it('true when the product has a non-empty title (Keepa returned real data)', () => {
-    expect(isFoundProduct({ asin: 'B00MNV8E0C', title: 'Real Product' })).toBe(true);
+    expect(isFoundProduct(processedProduct({ title: 'Real Product' }))).toBe(true);
   });
 
   it('false when title is missing (Keepa stub for unknown ASIN)', () => {
-    expect(isFoundProduct({ asin: '1234567890' })).toBe(false);
+    expect(isFoundProduct(processedProduct({ asin: '1234567890' }))).toBe(false);
   });
 
   it('false when title is an empty string', () => {
-    expect(isFoundProduct({ asin: 'B00MNV8E0C', title: '' })).toBe(false);
+    expect(isFoundProduct(processedProduct({ title: '' }))).toBe(false);
+  });
+});
+
+describe('parseImagesCsv', () => {
+  it('returns [] for undefined or empty input', () => {
+    expect(parseImagesCsv(undefined)).toEqual([]);
+    expect(parseImagesCsv('')).toEqual([]);
+  });
+
+  it('builds region-neutral URLs for every comma-separated entry', () => {
+    expect(parseImagesCsv('a.jpg,b.jpg,c.jpg')).toEqual([
+      'https://m.media-amazon.com/images/I/a.jpg',
+      'https://m.media-amazon.com/images/I/b.jpg',
+      'https://m.media-amazon.com/images/I/c.jpg',
+    ]);
+  });
+
+  it('skips empty entries from a malformed CSV (e.g. trailing comma)', () => {
+    expect(parseImagesCsv('a.jpg,,b.jpg,')).toEqual([
+      'https://m.media-amazon.com/images/I/a.jpg',
+      'https://m.media-amazon.com/images/I/b.jpg',
+    ]);
   });
 });
 

@@ -8,11 +8,8 @@ import {
   AMAZON_IMAGE_BASE,
   KEEPA_NO_DATA_SENTINEL,
 } from './constant.js';
-import type {
-  KeepaProduct,
-  KeepaProductResponse,
-  ProductListParams,
-} from './product.type.js';
+import type { KeepaProduct, ProductListParams } from './product.type.js';
+import type { KeepaProductRaw, KeepaProductResponseRaw } from './product.raw.type.js';
 
 export class Products extends APIResource {
   async list(params: ProductListParams): Promise<KeepaProduct[]> {
@@ -21,7 +18,7 @@ export class Products extends APIResource {
     }
     const asins = normalizeAsins(params.asins);
     const domain = resolveDomainId(params.marketplace);
-    const data = await this._client._request<KeepaProductResponse>({
+    const data = await this._client._request<KeepaProductResponseRaw>({
       path: PRODUCT_PATH,
       query: {
         domain,
@@ -30,8 +27,25 @@ export class Products extends APIResource {
       },
       context: PRODUCT_API_CONTEXT,
     });
-    return data.products ?? [];
+    return (data.products ?? []).map(toKeepaProduct);
   }
+}
+
+/** Map Keepa's raw wire shape into the consumer-friendly KeepaProduct. */
+function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
+  return {
+    asin: raw.asin,
+    title: raw.title,
+    description: raw.description,
+    parentAsin: raw.parentAsin,
+    categoryTree: raw.categoryTree,
+    rootCategory: raw.rootCategory,
+    salesRanks: raw.salesRanks,
+    variations: raw.variations,
+    bulletPoints: raw.bulletPoints,
+    images: parseImagesCsv(raw.imagesCSV),
+    bsr: extractBsr(raw.salesRanks, raw.rootCategory),
+  };
 }
 
 /** Returns true when Keepa returned an actual product record (not just a stub
@@ -40,9 +54,22 @@ export function isFoundProduct(product: KeepaProduct): boolean {
   return typeof product.title === 'string' && product.title.length > 0;
 }
 
+/** Build the full image-URL list from a Keepa imagesCSV string. Region-neutral CDN.
+ *  Most consumers won't need this directly — `Products.list` already fills `images[]`
+ *  on every returned product. Useful when working with a raw Keepa response. */
+export function parseImagesCsv(imagesCSV: string | undefined): string[] {
+  if (!imagesCSV) return [];
+  return imagesCSV
+    .split(',')
+    .filter((entry) => entry.length > 0)
+    .map((filename) => `${AMAZON_IMAGE_BASE}/${filename}`);
+}
+
 /** Extract the most recent real BSR from Keepa's `[ts, rank, ts, rank, ...]` salesRanks array.
  *  Walks backward through rank entries (odd indices) and skips Keepa's `-1` sentinel which
- *  marks "no data captured at that timestamp". Returns `null` if every entry is sentinel. */
+ *  marks "no data captured at that timestamp". Returns `null` if every entry is sentinel.
+ *  Most consumers won't need this — `Products.list` already fills `bsr` on every returned
+ *  product. Useful when working with a raw Keepa response. */
 export function extractBsr(
   salesRanks: Record<string, number[]> | undefined,
   rootCategory: number | undefined,
@@ -57,10 +84,9 @@ export function extractBsr(
   return null;
 }
 
-/** Build a full Amazon image URL from the first entry in Keepa's imagesCSV. */
+/** Build a single Amazon image URL from the first entry in Keepa's imagesCSV.
+ *  Equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Useful when working with
+ *  a raw Keepa response. */
 export function extractImageUrl(imagesCSV: string | undefined): string | null {
-  if (!imagesCSV) return null;
-  const firstImage = imagesCSV.split(',')[0];
-  if (!firstImage) return null;
-  return `${AMAZON_IMAGE_BASE}/${firstImage}`;
+  return parseImagesCsv(imagesCSV)[0] ?? null;
 }
