@@ -3,9 +3,7 @@ import { Keepa } from '../../src/client.js';
 import {
   Products,
   extractBsr,
-  extractImageUrl,
   isFoundProduct,
-  parseImagesCsv,
 } from '../../src/resources/products/products.js';
 import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
@@ -21,13 +19,17 @@ function makeClient(fetchImpl: typeof globalThis.fetch): Keepa {
 
 describe('Products.list', () => {
   it('builds the correct URL and returns processed products on success', async () => {
-    // Wire shape (what Keepa actually returns) — note imagesCSV, no images/bsr fields.
+    // Wire shape (what Keepa actually returns) — `images` is an array of
+    // {l, lH, lW, m, mH, mW} objects, no flat `images: string[]` or `bsr` field.
     const rawProduct = {
       asin: 'B07XYZ1234',
       title: 'Sample',
       rootCategory: 1,
       salesRanks: { '1': [1000, 50, 2000, 42] },
-      imagesCSV: 'aaa.jpg,bbb.jpg',
+      images: [
+        { l: 'aaa.jpg', lH: 1500, lW: 1500, m: 'aaa-m.jpg', mH: 500, mW: 500 },
+        { l: 'bbb.jpg', lH: 1500, lW: 1500, m: 'bbb-m.jpg', mH: 500, mW: 500 },
+      ],
     };
     const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [rawProduct] }));
     const client = makeClient(fakeFetch);
@@ -37,7 +39,8 @@ describe('Products.list', () => {
       marketplace: 'US',
     });
 
-    // Processed shape: imagesCSV is gone, images[] and bsr are derived for the consumer.
+    // Processed shape: the raw images[] objects are flattened to URL strings,
+    // bsr is derived from salesRanks.
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       asin: 'B07XYZ1234',
@@ -50,7 +53,6 @@ describe('Products.list', () => {
       ],
       bsr: 42,
     });
-    expect(result[0]).not.toHaveProperty('imagesCSV');
 
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
@@ -242,52 +244,43 @@ describe('isFoundProduct', () => {
   });
 });
 
-describe('parseImagesCsv', () => {
-  it('returns [] for undefined or empty input', () => {
-    expect(parseImagesCsv(undefined)).toEqual([]);
-    expect(parseImagesCsv('')).toEqual([]);
-  });
-
-  it('builds region-neutral URLs for every comma-separated entry', () => {
-    expect(parseImagesCsv('a.jpg,b.jpg,c.jpg')).toEqual([
-      'https://m.media-amazon.com/images/I/a.jpg',
-      'https://m.media-amazon.com/images/I/b.jpg',
-      'https://m.media-amazon.com/images/I/c.jpg',
-    ]);
-  });
-
-  it('skips empty entries from a malformed CSV (e.g. trailing comma)', () => {
-    expect(parseImagesCsv('a.jpg,,b.jpg,')).toEqual([
-      'https://m.media-amazon.com/images/I/a.jpg',
-      'https://m.media-amazon.com/images/I/b.jpg',
-    ]);
-  });
-
-  it('rejects entries that look like path traversal or are otherwise non-image filenames', () => {
-    expect(parseImagesCsv('../../etc/passwd,abc.jpg')).toEqual([
-      'https://m.media-amazon.com/images/I/abc.jpg',
-    ]);
-    expect(parseImagesCsv('a/b.jpg,evil%2e%2e.png')).toEqual([]);
-    expect(parseImagesCsv('script.js,malware.exe')).toEqual([]);
-    expect(parseImagesCsv('valid.JPG,VALID.WEBP,not-image.txt')).toEqual([
-      'https://m.media-amazon.com/images/I/valid.JPG',
-      'https://m.media-amazon.com/images/I/VALID.WEBP',
-    ]);
-  });
-});
-
-describe('extractImageUrl', () => {
-  it('returns null when imagesCSV is undefined', () => {
-    expect(extractImageUrl(undefined)).toBeNull();
-  });
-
-  it('returns null when imagesCSV is empty', () => {
-    expect(extractImageUrl('')).toBeNull();
-  });
-
-  it('builds a region-neutral Amazon image URL from the first image in the CSV', () => {
-    expect(extractImageUrl('abc123.jpg,xyz.jpg')).toBe(
-      'https://m.media-amazon.com/images/I/abc123.jpg',
+describe('Products.list — image mapping (raw KeepaImageRaw[] → URL string[])', () => {
+  function withImages(rawImages: unknown): Promise<{ images: string[] } | undefined> {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [{ asin: 'B07XYZ1234', title: 'Sample', images: rawImages }],
+      }),
     );
+    const client = makeClient(fakeFetch);
+    return client.products
+      .list({ asins: ['B07XYZ1234'] })
+      .then((result) => result[0] as { images: string[] } | undefined);
+  }
+
+  it('returns [] when raw images is missing or empty', async () => {
+    expect((await withImages(undefined))?.images).toEqual([]);
+    expect((await withImages([]))?.images).toEqual([]);
+  });
+
+  it('uses the large variant filename (`l`) for every entry', async () => {
+    const product = await withImages([
+      { l: 'aaa.jpg', lH: 1500, lW: 1500, m: 'aaa-m.jpg', mH: 500, mW: 500 },
+      { l: 'bbb.jpg', lH: 1500, lW: 1500, m: 'bbb-m.jpg', mH: 500, mW: 500 },
+    ]);
+    expect(product?.images).toEqual([
+      'https://m.media-amazon.com/images/I/aaa.jpg',
+      'https://m.media-amazon.com/images/I/bbb.jpg',
+    ]);
+  });
+
+  it('rejects entries whose filename does not look like an image (defense in depth)', async () => {
+    const product = await withImages([
+      { l: '../../etc/passwd', lH: 1, lW: 1, m: 'm.jpg', mH: 1, mW: 1 },
+      { l: 'good.jpg', lH: 1500, lW: 1500, m: 'm.jpg', mH: 500, mW: 500 },
+      { l: 'malware.exe', lH: 1, lW: 1, m: 'm.jpg', mH: 1, mW: 1 },
+    ]);
+    expect(product?.images).toEqual([
+      'https://m.media-amazon.com/images/I/good.jpg',
+    ]);
   });
 });

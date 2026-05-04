@@ -18,6 +18,17 @@ export interface KeepaVariationRaw {
   attributes?: KeepaVariationAttributeRaw[];
 }
 
+// Each image Keepa returns has a large variant (`l`/`lH`/`lW`) and a medium
+// variant (`m`/`mH`/`mW`). Filenames resolve under the Amazon image CDN.
+export interface KeepaImageRaw {
+  l: string;
+  lH: number;
+  lW: number;
+  m: string;
+  mH: number;
+  mW: number;
+}
+
 export interface KeepaProductRaw {
   asin: string;
   title?: string;
@@ -26,9 +37,9 @@ export interface KeepaProductRaw {
   categoryTree?: KeepaCategoryNodeRaw[];
   rootCategory?: number;
   salesRanks?: Record<string, number[]>;
-  imagesCSV?: string;
+  images?: KeepaImageRaw[];
   variations?: KeepaVariationRaw[];
-  bulletPoints?: string[];
+  features?: string[];
 }
 
 export interface KeepaProductResponseRaw {

@@ -36,7 +36,7 @@ export interface KeepaProduct {
   rootCategory?: number;
   salesRanks?: Record<string, number[]>;
   variations?: KeepaVariation[];
-  bulletPoints?: string[];
+  features?: string[];
 
   /** Full image URLs derived from imagesCSV using a region-neutral Amazon CDN. */
   images: string[];

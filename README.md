@@ -86,7 +86,7 @@ The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
 - `images: string[]` — full image URLs (region-neutral CDN). Replaces Keepa's awkward `imagesCSV` string.
 - `bsr: number | null` — most recent real BSR for the product's `rootCategory`. `null` when missing or every history entry is Keepa's `-1` "no data captured" sentinel.
 
-The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `bulletPoints`, …) pass through unchanged.
+The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `features`, …) pass through unchanged.
 
 **Stub records:** Keepa returns one record per requested ASIN even when it has no data — these stubs have `title === undefined`. Filter with `isFoundProduct` (below).
 

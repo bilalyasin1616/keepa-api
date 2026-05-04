@@ -10,7 +10,11 @@ import {
   VALID_IMAGE_FILENAME,
 } from './constant.js';
 import type { KeepaProduct, ProductListParams } from './product.type.js';
-import type { KeepaProductRaw, KeepaProductResponseRaw } from './product.raw.type.js';
+import type {
+  KeepaImageRaw,
+  KeepaProductRaw,
+  KeepaProductResponseRaw,
+} from './product.raw.type.js';
 
 export class Products extends APIResource {
   async list(params: ProductListParams): Promise<KeepaProduct[]> {
@@ -49,10 +53,20 @@ function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     rootCategory: raw.rootCategory,
     salesRanks: raw.salesRanks,
     variations: raw.variations,
-    bulletPoints: raw.bulletPoints,
-    images: parseImagesCsv(raw.imagesCSV),
+    features: raw.features,
+    images: rawImagesToUrls(raw.images),
     bsr: extractBsr(raw.salesRanks, raw.rootCategory),
   };
+}
+
+/** Convert Keepa's raw images array into full Amazon image URLs (the large
+ *  variant). Filters entries whose filename doesn't match the expected
+ *  alphanumeric image-name pattern as defense-in-depth. */
+function rawImagesToUrls(images: KeepaImageRaw[] | undefined): string[] {
+  if (!images || images.length === 0) return [];
+  return images
+    .filter((img) => typeof img.l === 'string' && VALID_IMAGE_FILENAME.test(img.l))
+    .map((img) => `${AMAZON_IMAGE_BASE}/${img.l}`);
 }
 
 /** Returns true when Keepa returned an actual product record (not just a stub
@@ -65,19 +79,6 @@ function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
  *  `categoryTree` or another non-string field. */
 export function isFoundProduct(product: KeepaProduct): boolean {
   return typeof product.title === 'string' && product.title.length > 0;
-}
-
-/** Build the full image-URL list from a Keepa imagesCSV string. Region-neutral CDN.
- *  Filters out entries that don't look like image filenames (path traversal,
- *  arbitrary extensions, etc.) — defense in case the CSV is ever influenced by
- *  untrusted input. Most consumers won't need this directly: `Products.list`
- *  already fills `images[]` on every returned product. */
-export function parseImagesCsv(imagesCSV: string | undefined): string[] {
-  if (!imagesCSV) return [];
-  return imagesCSV
-    .split(',')
-    .filter((entry) => VALID_IMAGE_FILENAME.test(entry))
-    .map((filename) => `${AMAZON_IMAGE_BASE}/${filename}`);
 }
 
 /** Extract the most recent real BSR from Keepa's `[ts, rank, ts, rank, ...]` salesRanks array.
@@ -103,9 +104,3 @@ export function extractBsr(
   return null;
 }
 
-/** Build a single Amazon image URL from the first entry in Keepa's imagesCSV.
- *  Equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Useful when working with
- *  a raw Keepa response. */
-export function extractImageUrl(imagesCSV: string | undefined): string | null {
-  return parseImagesCsv(imagesCSV)[0] ?? null;
-}
