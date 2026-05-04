@@ -1,3 +1,6 @@
+// The 11 marketplaces consumed by the existing internal projects. Keepa supports more
+// (AE, NL, PL, SE, BR, TR, …); extend this map and the README marketplace table when
+// a new region is needed. The numeric id is Keepa's `domain` query parameter value.
 export const MARKETPLACE_DOMAINS = {
   US: 1,
   UK: 2,

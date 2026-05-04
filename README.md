@@ -105,10 +105,10 @@ for (const product of real) {
 
 | Helper | Signature | Returns |
 |--------|-----------|---------|
-| `isFoundProduct(p)` | `(p: KeepaProduct) => boolean` | `true` only if Keepa returned real data (`title` is non-empty). |
-| `parseImagesCsv(csv)` | `(string \| undefined) => string[]` | Build the full image-URL list from a raw Keepa imagesCSV. Used internally to fill `images`; exported for advanced use. |
-| `extractBsr(salesRanks, rootCategory)` | `(Record<string, number[]> \| undefined, number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
-| `extractImageUrl(imagesCSV)` | `(string \| undefined) => string \| null` | Single URL — equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Exported for advanced use. |
+| `isFoundProduct(product)` | `(product: KeepaProduct) => boolean` | `true` only if Keepa returned real data (`title` is non-empty). |
+| `parseImagesCsv(csv)` | `(csv: string \| undefined) => string[]` | Build the full image-URL list from a raw Keepa imagesCSV. Used internally to fill `images`; exported for advanced use. |
+| `extractBsr(salesRanks, rootCategory)` | `(salesRanks: Record<string, number[]> \| undefined, rootCategory: number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
+| `extractImageUrl(imagesCSV)` | `(imagesCSV: string \| undefined) => string \| null` | Single URL — equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Exported for advanced use. |
 
 ### ASIN validation
 
@@ -200,6 +200,7 @@ npm run clean       # rm -rf dist
 - [ ] `AbortSignal` / configurable timeout on `Products.list` (default ~30s) — currently a hung Keepa server keeps the request pending forever
 - [ ] Pass-through `init` (method, headers, signal) on `core/request` for resources that need POST or custom headers
 - [ ] Cap `asins.length` at Keepa's per-call limit (100) instead of letting Keepa silently truncate
+- [ ] Optional `retryOn429` (with backoff) — currently we throw `RateLimitError` immediately; consumers handle pacing in their own code
 
 **Distribution**
 - [ ] CommonJS build alongside ESM

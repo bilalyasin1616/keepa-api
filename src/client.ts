@@ -35,6 +35,9 @@ export class Keepa {
     this.apiKey = apiKey;
     // Strip a trailing slash so `${baseURL}${path}` never produces `//product`.
     this.baseURL = (options.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+    // Bind `globalThis` once: an unbound reference to Node's fetch throws
+    // "Illegal invocation" when called with an undefined `this`. Bind once at
+    // construction so every _request call uses the cached bound function.
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
     this.products = new Products(this);

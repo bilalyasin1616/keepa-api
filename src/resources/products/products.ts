@@ -3,7 +3,7 @@ import { resolveDomainId } from '../../lib/marketplace.js';
 import { normalizeAsins } from '../../lib/asin.js';
 import {
   PRODUCT_PATH,
-  PRODUCT_API_CONTEXT,
+  PRODUCT_LIST_CONTEXT,
   DEFAULT_DAYS,
   AMAZON_IMAGE_BASE,
   KEEPA_NO_DATA_SENTINEL,
@@ -32,7 +32,7 @@ export class Products extends APIResource {
         asin: asins,
         days: params.days ?? DEFAULT_DAYS,
       },
-      context: PRODUCT_API_CONTEXT,
+      context: PRODUCT_LIST_CONTEXT,
     });
     return (data.products ?? []).map(toKeepaProduct);
   }

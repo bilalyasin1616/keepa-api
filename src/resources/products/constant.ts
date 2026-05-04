@@ -1,5 +1,8 @@
 export const PRODUCT_PATH = '/product';
-export const PRODUCT_API_CONTEXT = 'product API';
+// Structured tag of the form `<resource>.<method>`. Used as the `context` field on
+// errors thrown from this method — keeps log aggregators able to filter cleanly as
+// more methods land (categories.list, categories.search, bestsellers.retrieve, …).
+export const PRODUCT_LIST_CONTEXT = 'products.list';
 export const DEFAULT_DAYS = 1;
 
 // Region-neutral Amazon image CDN. Serves the same images globally regardless of marketplace.
