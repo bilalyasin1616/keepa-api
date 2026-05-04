@@ -1,5 +1,6 @@
 import { request } from './core/request.js';
 import type { RequestArgs, RequestConfig } from './core/request.js';
+import { Products } from './resources/products.js';
 
 export interface ClientOptions {
   /** Keepa API key. Falls back to `process.env.KEEPA_API_KEY`. */
@@ -17,6 +18,8 @@ export class Keepa {
   readonly baseURL: string;
   readonly fetch: typeof globalThis.fetch;
 
+  readonly products: Products;
+
   constructor(options: ClientOptions = {}) {
     const apiKey = options.apiKey || process.env.KEEPA_API_KEY;
     if (!apiKey) {
@@ -27,6 +30,8 @@ export class Keepa {
     this.apiKey = apiKey;
     this.baseURL = options.baseURL ?? DEFAULT_BASE_URL;
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
+
+    this.products = new Products(this);
   }
 
   /** Internal: used by APIResource subclasses to perform a request. */

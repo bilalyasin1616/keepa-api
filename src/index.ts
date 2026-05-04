@@ -16,4 +16,6 @@ export {
   type DomainId,
 } from './lib/marketplace.js';
 
+export * from './resources/index.js';
+
 export { VERSION } from './version.js';
