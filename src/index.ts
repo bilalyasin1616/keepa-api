@@ -1,1 +1,29 @@
-export {};
+export { Keepa as default, Keepa, type ClientOptions } from './client.js';
+
+export {
+  KeepaError,
+  APIError,
+  RateLimitError,
+  AuthenticationError,
+  NetworkError,
+} from './core/error.js';
+
+export { APIResource } from './core/resource.js';
+
+export {
+  MARKETPLACE_DOMAINS,
+  resolveDomainId,
+  type Marketplace,
+  type DomainId,
+} from './lib/marketplace.js';
+
+export {
+  ASIN_LENGTH,
+  ASIN_REGEX,
+  isValidAsin,
+  normalizeAsins,
+} from './lib/asin.js';
+
+export * from './resources/index.js';
+
+export { VERSION } from './version.js';
