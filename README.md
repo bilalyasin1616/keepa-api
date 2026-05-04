@@ -79,7 +79,7 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 |-------|------|---------|-------|
 | `asins` | `string[]` | (required) | Validated + uppercased. Throws on malformed input. |
 | `marketplace` | `'US' \| 'UK' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'AU'` | `'US'` | Case-insensitive. Throws on unknown. |
-| `days` | `number` | `1` | Days of price history to include. |
+| `days` | `number` | `1` | Days of price history. Must be a positive integer (validated pre-flight). |
 
 The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
 
@@ -191,9 +191,17 @@ npm run clean       # rm -rf dist
 
 ## Roadmap
 
+**Resources**
 - [ ] `Categories` resource (`fetchKeepaCategories`)
 - [ ] `Categories.search` (`searchKeepaCategories`)
 - [ ] `Bestsellers.retrieve` (`fetchKeepaBestSeller`)
+
+**Request layer**
+- [ ] `AbortSignal` / configurable timeout on `Products.list` (default ~30s) — currently a hung Keepa server keeps the request pending forever
+- [ ] Pass-through `init` (method, headers, signal) on `core/request` for resources that need POST or custom headers
+- [ ] Cap `asins.length` at Keepa's per-call limit (100) instead of letting Keepa silently truncate
+
+**Distribution**
 - [ ] CommonJS build alongside ESM
 - [ ] Publish to npm
 

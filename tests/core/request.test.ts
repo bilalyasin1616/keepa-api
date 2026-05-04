@@ -108,4 +108,37 @@ describe('request', () => {
       expect((err as NetworkError).context).toBe('product API');
     }
   });
+
+  it('does NOT leak the API key into APIError.message or .body on a server error', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      new Response('upstream said: ?key=test-key&domain=1', { status: 500 }),
+    );
+    try {
+      await request(
+        { ...base, fetch: fakeFetch },
+        { path: '/product', context: 'product API' },
+      );
+      throw new Error('expected to throw');
+    } catch (err) {
+      const e = err as APIError;
+      expect(e.message).not.toContain('test-key');
+      expect(e.body).not.toContain('test-key');
+      expect(e.message).toMatch(/REDACTED/);
+    }
+  });
+
+  it('does NOT leak the API key when a fetch failure message echoes the URL', async () => {
+    const cause = new TypeError('fetch failed: GET https://api.keepa.com/product?key=test-key&domain=1');
+    const fakeFetch = vi.fn().mockRejectedValue(cause);
+    try {
+      await request(
+        { ...base, fetch: fakeFetch },
+        { path: '/product', context: 'product API' },
+      );
+      throw new Error('expected to throw');
+    } catch (err) {
+      expect((err as NetworkError).message).not.toContain('test-key');
+      expect((err as NetworkError).message).toMatch(/REDACTED/);
+    }
+  });
 });

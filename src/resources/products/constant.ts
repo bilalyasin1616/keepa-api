@@ -7,3 +7,8 @@ export const AMAZON_IMAGE_BASE = 'https://m.media-amazon.com/images/I';
 
 // Keepa stores `-1` in salesRanks/price arrays to indicate "no data captured at that timestamp".
 export const KEEPA_NO_DATA_SENTINEL = -1;
+
+// Allowlist for image filenames in imagesCSV. Defends against path-traversal / SSRF
+// shaped strings (e.g. "../../etc/passwd") in case the CSV is ever influenced by
+// untrusted input. Matches typical Keepa image hashes (e.g. "61abcDEF.jpg").
+export const VALID_IMAGE_FILENAME = /^[A-Za-z0-9._-]+\.(jpg|jpeg|png|webp)$/i;

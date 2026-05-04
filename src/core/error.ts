@@ -1,3 +1,11 @@
+/** Replace any `?key=...` or `&key=...` segment with a REDACTED placeholder.
+ *  Defense-in-depth: keeps the API key out of error messages even when an
+ *  underlying transport error or upstream response echoes the request URL.
+ *  Exported for use by callers that build their own error wrappers. */
+export function scrubApiKey(text: string): string {
+  return text.replace(/([?&])key=[^&\s]*/gi, '$1key=REDACTED');
+}
+
 export class KeepaError extends Error {
   constructor(message: string) {
     super(message);
@@ -11,11 +19,12 @@ export class APIError extends KeepaError {
   readonly body: string;
 
   constructor(status: number, context: string, body: string, message?: string) {
-    super(message ?? `Keepa ${context} error (${status}): ${body}`);
+    const safeBody = scrubApiKey(body);
+    super(scrubApiKey(message ?? `Keepa ${context} error (${status}): ${safeBody}`));
     this.name = 'APIError';
     this.status = status;
     this.context = context;
-    this.body = body;
+    this.body = safeBody;
   }
 
   static async from(response: Response, context: string): Promise<APIError> {
@@ -55,8 +64,8 @@ export class NetworkError extends KeepaError {
   override readonly cause: unknown;
 
   constructor(context: string, cause: unknown) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    super(`Keepa ${context} network error: ${detail}`);
+    const raw = cause instanceof Error ? cause.message : String(cause);
+    super(`Keepa ${context} network error: ${scrubApiKey(raw)}`);
     this.name = 'NetworkError';
     this.context = context;
     this.cause = cause;

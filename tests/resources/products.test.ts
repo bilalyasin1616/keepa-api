@@ -85,6 +85,20 @@ describe('Products.list', () => {
     expect(url).toContain('domain=3');
   });
 
+  it.each([
+    { days: 0, label: 'zero' },
+    { days: -5, label: 'negative' },
+    { days: 1.5, label: 'fractional' },
+    { days: Number.NaN, label: 'NaN' },
+  ])('throws on invalid days ($label) before any HTTP call', async ({ days }) => {
+    const fakeFetch = vi.fn();
+    const client = makeClient(fakeFetch);
+    await expect(
+      client.products.list({ asins: ['B07XYZ1234'], days }),
+    ).rejects.toThrow(/Invalid days/);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+
   it('defaults days to 1 and lets the caller override it', async () => {
     const fakeFetch = vi.fn().mockImplementation(async () => jsonResponse({ products: [] }));
     const client = makeClient(fakeFetch);
@@ -198,6 +212,16 @@ describe('extractBsr', () => {
   it('returns null when every rank is the -1 sentinel', () => {
     expect(extractBsr({ '1': [1000, -1, 2000, -1] }, 1)).toBeNull();
   });
+
+  it('handles odd-length arrays without treating a timestamp as a rank', () => {
+    // [ts, rank, ts] — odd length. Naive `length-1` would point at the trailing
+    // timestamp 9999 and return it as a rank. Correct behavior: skip it, return 50.
+    expect(extractBsr({ '1': [1000, 50, 9999] }, 1)).toBe(50);
+    // [ts, rank, ts, rank, ts] — same shape, longer.
+    expect(extractBsr({ '1': [1000, 50, 2000, 42, 9999] }, 1)).toBe(42);
+    // Odd length with a single trailing ts and no real ranks before — null.
+    expect(extractBsr({ '1': [1000] }, 1)).toBeNull();
+  });
 });
 
 describe('isFoundProduct', () => {
@@ -236,6 +260,18 @@ describe('parseImagesCsv', () => {
     expect(parseImagesCsv('a.jpg,,b.jpg,')).toEqual([
       'https://m.media-amazon.com/images/I/a.jpg',
       'https://m.media-amazon.com/images/I/b.jpg',
+    ]);
+  });
+
+  it('rejects entries that look like path traversal or are otherwise non-image filenames', () => {
+    expect(parseImagesCsv('../../etc/passwd,abc.jpg')).toEqual([
+      'https://m.media-amazon.com/images/I/abc.jpg',
+    ]);
+    expect(parseImagesCsv('a/b.jpg,evil%2e%2e.png')).toEqual([]);
+    expect(parseImagesCsv('script.js,malware.exe')).toEqual([]);
+    expect(parseImagesCsv('valid.JPG,VALID.WEBP,not-image.txt')).toEqual([
+      'https://m.media-amazon.com/images/I/valid.JPG',
+      'https://m.media-amazon.com/images/I/VALID.WEBP',
     ]);
   });
 });

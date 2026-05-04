@@ -48,6 +48,11 @@ describe('Keepa client', () => {
       const client = new Keepa({ apiKey: 'k', baseURL: 'https://custom.test' });
       expect(client.baseURL).toBe('https://custom.test');
     });
+
+    it('strips a trailing slash so {baseURL}{path} does not produce a double slash', () => {
+      const client = new Keepa({ apiKey: 'k', baseURL: 'https://custom.test/' });
+      expect(client.baseURL).toBe('https://custom.test');
+    });
   });
 
   describe('_request', () => {

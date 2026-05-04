@@ -33,7 +33,8 @@ export class Keepa {
       );
     }
     this.apiKey = apiKey;
-    this.baseURL = options.baseURL ?? DEFAULT_BASE_URL;
+    // Strip a trailing slash so `${baseURL}${path}` never produces `//product`.
+    this.baseURL = (options.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
     this.products = new Products(this);
