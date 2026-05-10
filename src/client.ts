@@ -13,7 +13,7 @@ export interface ClientOptions {
 
 const DEFAULT_BASE_URL = 'https://api.keepa.com';
 
-export class Keepa {
+export class KeepaClient {
   readonly apiKey: string;
   readonly baseURL: string;
   readonly fetch: typeof globalThis.fetch;
@@ -29,7 +29,7 @@ export class Keepa {
     const apiKey = options.apiKey || envApiKey;
     if (!apiKey) {
       throw new Error(
-        'Missing Keepa API key. Pass it as `new Keepa({ apiKey })` or set KEEPA_API_KEY in your environment.',
+        'Missing Keepa API key. Pass it as `new KeepaClient({ apiKey })` or set KEEPA_API_KEY in your environment.',
       );
     }
     this.apiKey = apiKey;
@@ -54,4 +54,4 @@ export class Keepa {
   }
 }
 
-export default Keepa;
+export default KeepaClient;

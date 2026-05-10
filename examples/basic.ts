@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import Keepa, { isFoundProduct } from '../src/index.js';
+import KeepaClient, { isFoundProduct } from '../src/index.js';
 
 async function main(): Promise<void> {
-  const keepa = new Keepa({ apiKey: process.env.KEEPA_API_KEY });
+  const keepa = new KeepaClient({ apiKey: process.env.KEEPA_API_KEY });
 
   // A handful of popular Amazon products that should have rich Keepa data
   // (title, BSR, images). Listed in one call so we burn a single token batch.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Keepa } from '../../src/client.js';
+import { KeepaClient } from '../../src/client.js';
 import { Products } from '../../src/resources/products/products.js';
 import {
   extractBsr,
@@ -14,8 +14,8 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
-function makeClient(fetchImpl: typeof globalThis.fetch): Keepa {
-  return new Keepa({ apiKey: 'test-key', fetch: fetchImpl });
+function makeClient(fetchImpl: typeof globalThis.fetch): KeepaClient {
+  return new KeepaClient({ apiKey: 'test-key', fetch: fetchImpl });
 }
 
 describe('Products.list', () => {
@@ -266,8 +266,8 @@ describe('Products.retrieve', () => {
 });
 
 describe('client wiring', () => {
-  it('Keepa.products is a Products instance after construction', () => {
-    const client = new Keepa({ apiKey: 'k' });
+  it('KeepaClient.products is a Products instance after construction', () => {
+    const client = new KeepaClient({ apiKey: 'k' });
     expect(client.products).toBeInstanceOf(Products);
   });
 });

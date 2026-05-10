@@ -1,6 +1,6 @@
 # keepa-api
 
-Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. Mirrors the organizational style of [openai-node](https://github.com/openai/openai-node) — a single `Keepa` client class exposes resources (`products`, etc.) that wrap each endpoint with typed inputs and responses.
+Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. Mirrors the organizational style of [openai-node](https://github.com/openai/openai-node) — a single `KeepaClient` class exposes resources (`products`, etc.) that wrap each endpoint with typed inputs and responses.
 
 Phase 1 ships the **Products** resource only. Categories, Search, and Bestsellers are planned but not yet implemented.
 
@@ -49,9 +49,9 @@ npm install /absolute/path/to/keepa-api-0.1.0.tgz
 ## Quickstart
 
 ```ts
-import Keepa from 'keepa-api';
+import KeepaClient from 'keepa-api';
 
-const keepa = new Keepa({ apiKey: process.env.KEEPA_API_KEY });
+const keepa = new KeepaClient({ apiKey: process.env.KEEPA_API_KEY });
 
 const products = await keepa.products.list({
   asins: ['B00MNV8E0C'],
@@ -65,7 +65,7 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 
 ## API
 
-### `new Keepa(options?)`
+### `new KeepaClient(options?)`
 
 | Option | Type | Default | Notes |
 |--------|------|---------|-------|

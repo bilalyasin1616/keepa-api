@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import KeepaDefault, {
-  Keepa,
+  KeepaClient,
   KeepaError,
   APIError,
   RateLimitError,
@@ -12,8 +12,8 @@ import KeepaDefault, {
 } from '../src/index.js';
 
 describe('public API surface (src/index.ts)', () => {
-  it('default export is the Keepa class', () => {
-    expect(KeepaDefault).toBe(Keepa);
+  it('default export is the KeepaClient class', () => {
+    expect(KeepaDefault).toBe(KeepaClient);
   });
 
   it('exports the five error classes', () => {

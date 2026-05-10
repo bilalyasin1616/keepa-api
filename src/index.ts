@@ -1,4 +1,4 @@
-export { Keepa as default, Keepa, type ClientOptions } from './client.js';
+export { KeepaClient as default, KeepaClient, type ClientOptions } from './client.js';
 
 export {
   KeepaError,

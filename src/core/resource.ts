@@ -1,9 +1,9 @@
-import type { Keepa } from '../client.js';
+import type { KeepaClient } from '../client.js';
 
 export abstract class APIResource {
-  protected _client: Keepa;
+  protected _client: KeepaClient;
 
-  constructor(client: Keepa) {
+  constructor(client: KeepaClient) {
     this._client = client;
   }
 }
