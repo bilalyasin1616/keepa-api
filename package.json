@@ -35,6 +35,14 @@
     "asin"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bilalyasin1616/keepa-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bilalyasin1616/keepa-api/issues"
+  },
+  "homepage": "https://github.com/bilalyasin1616/keepa-api#readme",
   "devDependencies": {
     "@types/node": "^22.10.0",
     "dotenv": "^16.4.0",
