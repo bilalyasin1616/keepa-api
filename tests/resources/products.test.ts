@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Keepa } from '../../src/client.js';
+import { Products } from '../../src/resources/products/products.js';
 import {
-  Products,
   extractBsr,
   isFoundProduct,
-} from '../../src/resources/products/products.js';
+} from '../../src/resources/products/product.util.js';
 import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
+import { ProductNotFoundError } from '../../src/resources/products/error.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
@@ -177,6 +178,93 @@ describe('Products.list', () => {
   });
 });
 
+describe('Products.retrieve', () => {
+  it('returns the single product when Keepa has a real record', async () => {
+    const rawProduct = {
+      asin: 'B07XYZ1234',
+      title: 'Sample',
+      rootCategory: 1,
+      salesRanks: { '1': [1000, 50, 2000, 42] },
+      images: [
+        { l: 'aaa.jpg', lH: 1500, lW: 1500, m: 'aaa-m.jpg', mH: 500, mW: 500 },
+      ],
+    };
+    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [rawProduct] }));
+    const client = makeClient(fakeFetch);
+
+    const product = await client.products.retrieve({ asin: 'B07XYZ1234' });
+
+    expect(product).toMatchObject({
+      asin: 'B07XYZ1234',
+      title: 'Sample',
+      images: ['https://m.media-amazon.com/images/I/aaa.jpg'],
+      bsr: 42,
+    });
+    const url = fakeFetch.mock.calls[0]![0] as string;
+    expect(url).toContain('asin=B07XYZ1234');
+  });
+
+  it('forwards marketplace and days to the underlying request', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'x' }] }),
+    );
+    const client = makeClient(fakeFetch);
+
+    await client.products.retrieve({ asin: 'B07XYZ1234', marketplace: 'DE', days: 90 });
+
+    const url = fakeFetch.mock.calls[0]![0] as string;
+    expect(url).toContain('domain=3');
+    expect(url).toContain('days=90');
+  });
+
+  it('throws ProductNotFoundError when Keepa returns no products', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [] }));
+    const client = makeClient(fakeFetch);
+    await expect(
+      client.products.retrieve({ asin: 'B07XYZ1234' }),
+    ).rejects.toBeInstanceOf(ProductNotFoundError);
+  });
+
+  it('throws ProductNotFoundError when Keepa returns a stub (no title)', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    await expect(
+      client.products.retrieve({ asin: 'B07XYZ1234' }),
+    ).rejects.toBeInstanceOf(ProductNotFoundError);
+  });
+
+  it('ProductNotFoundError carries the ASIN as passed by the caller', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(jsonResponse({ products: [] }));
+    const client = makeClient(fakeFetch);
+    try {
+      await client.products.retrieve({ asin: 'B07XYZ1234' });
+      throw new Error('expected to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ProductNotFoundError);
+      expect((err as ProductNotFoundError).asin).toBe('B07XYZ1234');
+    }
+  });
+
+  it('propagates RateLimitError from the underlying request', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(new Response('too many', { status: 429 }));
+    const client = makeClient(fakeFetch);
+    await expect(
+      client.products.retrieve({ asin: 'B07XYZ1234' }),
+    ).rejects.toBeInstanceOf(RateLimitError);
+  });
+
+  it('rejects malformed ASIN before any HTTP call (delegates to list validation)', async () => {
+    const fakeFetch = vi.fn();
+    const client = makeClient(fakeFetch);
+    await expect(
+      client.products.retrieve({ asin: 'B07XYZ' }),
+    ).rejects.toThrow(/Invalid ASIN/);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('client wiring', () => {
   it('Keepa.products is a Products instance after construction', () => {
     const client = new Keepa({ apiKey: 'k' });
@@ -231,16 +319,16 @@ describe('isFoundProduct', () => {
     return { asin: 'B00MNV8E0C', images: [], bsr: null, ...overrides };
   }
 
-  it('true when the product has a non-empty title (Keepa returned real data)', () => {
+  it('true when the product has a title (Keepa returned real data)', () => {
     expect(isFoundProduct(processedProduct({ title: 'Real Product' }))).toBe(true);
   });
 
-  it('false when title is missing (Keepa stub for unknown ASIN)', () => {
-    expect(isFoundProduct(processedProduct({ asin: '1234567890' }))).toBe(false);
+  it('false when title is null (Keepa stub for unknown ASIN)', () => {
+    expect(isFoundProduct(processedProduct({ title: null as unknown as string }))).toBe(false);
   });
 
-  it('false when title is an empty string', () => {
-    expect(isFoundProduct(processedProduct({ title: '' }))).toBe(false);
+  it('false when title is missing entirely', () => {
+    expect(isFoundProduct(processedProduct({ asin: '1234567890' }))).toBe(false);
   });
 });
 

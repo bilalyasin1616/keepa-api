@@ -30,7 +30,7 @@ describe('public API surface (src/index.ts)', () => {
 
   it('exports marketplace utilities', () => {
     expect(MARKETPLACE_DOMAINS.US).toBe(1);
-    expect(resolveDomainId('UK')).toBe(2);
+    expect(resolveDomainId('GB')).toBe(2);
   });
 
   it('exports VERSION as a semver-shaped string', () => {

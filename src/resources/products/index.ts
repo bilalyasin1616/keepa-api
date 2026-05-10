@@ -1,7 +1,10 @@
-export { Products, extractBsr, isFoundProduct } from './products.js';
+export { Products } from './products.js';
+export { extractBsr, isFoundProduct } from './product.util.js';
+export { ProductNotFoundError } from './error.js';
 
 export type {
   ProductListParams,
+  ProductRetrieveParams,
   KeepaProduct,
   KeepaVariation,
   KeepaVariationAttribute,

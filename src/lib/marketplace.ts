@@ -1,9 +1,10 @@
-// The 11 marketplaces consumed by the existing internal projects. Keepa supports more
-// (AE, NL, PL, SE, BR, TR, …); extend this map and the README marketplace table when
-// a new region is needed. The numeric id is Keepa's `domain` query parameter value.
+// The full set of marketplaces Keepa currently supports. Codes are ISO 3166-1
+// alpha-2; the numeric id is Keepa's `domain` query parameter value. Domain 7
+// is reserved (formerly Amazon China, retired). Update the README marketplace
+// table alongside any change here.
 export const MARKETPLACE_DOMAINS = {
   US: 1,
-  UK: 2,
+  GB: 2,
   DE: 3,
   FR: 4,
   JP: 5,
@@ -12,7 +13,7 @@ export const MARKETPLACE_DOMAINS = {
   ES: 9,
   IN: 10,
   MX: 11,
-  AU: 13,
+  BR: 12,
 } as const;
 
 export type Marketplace = keyof typeof MARKETPLACE_DOMAINS;

@@ -8,6 +8,14 @@ export interface ProductListParams {
   days?: number;
 }
 
+export interface ProductRetrieveParams {
+  asin: string;
+  /** Marketplace code (case-insensitive at runtime). Defaults to 'US'. */
+  marketplace?: Marketplace;
+  /** Days of price history to include. Defaults to 1. */
+  days?: number;
+}
+
 export interface KeepaCategoryNode {
   catId: number;
   name: string;

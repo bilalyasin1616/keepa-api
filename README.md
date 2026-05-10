@@ -78,7 +78,7 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
 | `asins` | `string[]` | (required) | Validated + uppercased. Throws on malformed input. |
-| `marketplace` | `'US' \| 'UK' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'AU'` | `'US'` | Case-insensitive. Throws on unknown. |
+| `marketplace` | `'US' \| 'GB' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'BR'` | `'US'` | Case-insensitive. Throws on unknown. |
 | `days` | `number` | `1` | Days of price history. Must be a positive integer (validated pre-flight). |
 
 The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
@@ -88,7 +88,7 @@ The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
 
 The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `features`, …) pass through unchanged.
 
-**Stub records:** Keepa returns one record per requested ASIN even when it has no data — these stubs have `title === undefined`. Filter with `isFoundProduct` (below).
+**Stub records:** Keepa returns one record per requested ASIN even when it has no data — these stubs have `title === null`. Filter with `isFoundProduct` (below).
 
 ### Helpers
 
@@ -105,7 +105,7 @@ for (const product of real) {
 
 | Helper | Signature | Returns |
 |--------|-----------|---------|
-| `isFoundProduct(product)` | `(product: KeepaProduct) => boolean` | `true` only if Keepa returned real data (`title` is non-empty). |
+| `isFoundProduct(product)` | `(product: KeepaProduct) => boolean` | `true` only if Keepa returned real data (stubs have `title === null`). |
 | `parseImagesCsv(csv)` | `(csv: string \| undefined) => string[]` | Build the full image-URL list from a raw Keepa imagesCSV. Used internally to fill `images`; exported for advanced use. |
 | `extractBsr(salesRanks, rootCategory)` | `(salesRanks: Record<string, number[]> \| undefined, rootCategory: number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
 | `extractImageUrl(imagesCSV)` | `(imagesCSV: string \| undefined) => string \| null` | Single URL — equivalent to `parseImagesCsv(imagesCSV)[0] ?? null`. Exported for advanced use. |
@@ -133,17 +133,17 @@ normalizeAsins(['B07XYZ']);          // throws: Invalid ASIN(s): B07XYZ. ...
 import { MARKETPLACE_DOMAINS, resolveDomainId } from 'keepa-api';
 
 MARKETPLACE_DOMAINS.US;   // 1
-resolveDomainId('uk');    // 2 (case-insensitive)
+resolveDomainId('gb');    // 2 (case-insensitive)
 resolveDomainId(undefined); // 1 (defaults to US)
 ```
 
 | Code | Domain ID | Code | Domain ID |
 |------|-----------|------|-----------|
 | US   | 1         | IT   | 8         |
-| UK   | 2         | ES   | 9         |
+| GB   | 2         | ES   | 9         |
 | DE   | 3         | IN   | 10        |
 | FR   | 4         | MX   | 11        |
-| JP   | 5         | AU   | 13        |
+| JP   | 5         | BR   | 12        |
 | CA   | 6         |      |           |
 
 ### Errors

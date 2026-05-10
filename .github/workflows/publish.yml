@@ -1,12 +1,11 @@
 name: Publish to npm
 
-# Triggered when a `vX.Y.Z` tag is pushed (cut a release with
-# `git tag v0.1.1 && git push --tags`), or manually from the Actions tab.
+# Triggered when a GitHub Release is published. The release tag (vX.Y.Z) drives
+# the published version — package.json's version field is overwritten at publish
+# time, so its value on main is irrelevant.
 on:
-  push:
-    tags:
-      - 'v*.*.*'
-  workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -32,16 +31,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Verify package.json version matches the git tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Set package version from release tag
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
-            exit 1
-          fi
-          echo "Tag and package.json agree on $PKG_VERSION"
+          npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
 
       - name: Publish to npm (with provenance)
         run: npm publish --provenance --access public
