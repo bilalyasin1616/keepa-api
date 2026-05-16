@@ -37,12 +37,8 @@ describe('APIError', () => {
 });
 
 describe('APIError.from', () => {
-  function res(status: number, body: string): Response {
-    return new Response(body, { status });
-  }
-
-  it('returns RateLimitError on 429', async () => {
-    const err = await APIError.from(res(429, 'too many'), 'product API');
+  it('returns RateLimitError on 429', () => {
+    const err = APIError.from(429, 'product API', 'too many');
     expect(err).toBeInstanceOf(RateLimitError);
     expect(err).toBeInstanceOf(APIError);
     expect(err.status).toBe(429);
@@ -52,16 +48,29 @@ describe('APIError.from', () => {
     expect(err.name).toBe('RateLimitError');
   });
 
-  it('returns AuthenticationError on 401', async () => {
-    const err = await APIError.from(res(401, 'bad key'), 'product API');
+  it('attaches the rate-limit snapshot to RateLimitError when provided', () => {
+    const snapshot = {
+      tokensLeft: 0,
+      refillIn: 12_345,
+      refillRate: 60,
+      tokenFlowReduction: 0,
+      receivedAt: new Date(),
+    };
+    const err = APIError.from(429, 'product API', 'too many', snapshot);
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect((err as RateLimitError).rateLimit).toBe(snapshot);
+  });
+
+  it('returns AuthenticationError on 401', () => {
+    const err = APIError.from(401, 'product API', 'bad key');
     expect(err).toBeInstanceOf(AuthenticationError);
     expect(err.status).toBe(401);
     expect(err.message).toMatch(/authentication/i);
     expect(err.name).toBe('AuthenticationError');
   });
 
-  it('returns generic APIError for other 4xx/5xx', async () => {
-    const err = await APIError.from(res(503, 'down'), 'product API');
+  it('returns generic APIError for other 4xx/5xx', () => {
+    const err = APIError.from(503, 'product API', 'down');
     expect(err).toBeInstanceOf(APIError);
     expect(err).not.toBeInstanceOf(RateLimitError);
     expect(err).not.toBeInstanceOf(AuthenticationError);

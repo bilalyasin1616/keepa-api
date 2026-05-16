@@ -39,9 +39,9 @@ export interface PriceHistoryEntry {
   price: number;
 }
 
-/** Flag-gated fields (`price`, `listPrice`, `history.price.*`) are always present
- *  on the type and default to empty/null when the corresponding request flag
- *  wasn't set. */
+/** Flag-gated fields (`amazonPrice`, `newPrice`, `listPrice`, `history.price.*`)
+ *  are always present on the type and default to empty/null when the
+ *  corresponding request flag wasn't set. */
 export interface KeepaProduct {
   asin: string;
   title?: string;
@@ -58,18 +58,24 @@ export interface KeepaProduct {
   /** Null when missing or every history entry is Keepa's `-1` no-data sentinel. */
   bsr: number | null;
 
-  /** Latest entry from `history.price.amazon`; null when history wasn't
-   *  requested or Keepa has no data. Marketplace's major unit. */
-  price: number | null;
+  /** Latest Amazon-sold price (csv[0]) in the marketplace's major unit;
+   *  null when history wasn't requested or Keepa has no data. */
+  amazonPrice: number | null;
 
-  /** Latest entry from `history.price.list`; null when unavailable.
-   *  Marketplace's major unit. */
+  /** Latest lowest-3rd-party-new price (csv[1]) in the marketplace's major
+   *  unit. Distinct from `amazonPrice` — Amazon itself may not be the cheapest
+   *  new offer. */
+  newPrice: number | null;
+
+  /** Latest list price / MSRP (csv[4]) in the marketplace's major unit. */
   listPrice: number | null;
 
   history: {
     price: {
       /** Empty when `history: false`. Sentinel-filtered. */
       amazon: PriceHistoryEntry[];
+      /** Empty when `history: false`. Sentinel-filtered. */
+      new: PriceHistoryEntry[];
       /** Empty when `history: false`. Sentinel-filtered. */
       list: PriceHistoryEntry[];
     };

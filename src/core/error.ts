@@ -1,3 +1,5 @@
+import type { RateLimitInfo } from './rate-limit.js';
+
 /** Defense-in-depth — keeps the API key out of error messages even when a
  *  transport error or upstream response echoes the request URL back. */
 export function scrubApiKey(text: string): string {
@@ -25,23 +27,32 @@ export class APIError extends KeepaError {
     this.body = safeBody;
   }
 
-  static async from(response: Response, context: string): Promise<APIError> {
-    const body = await response.text().catch(() => '');
-    switch (response.status) {
+  static from(
+    status: number,
+    context: string,
+    body: string,
+    rateLimit: RateLimitInfo | null = null,
+  ): APIError {
+    switch (status) {
       case 429:
-        return new RateLimitError(context, body);
+        return new RateLimitError(context, body, rateLimit);
       case 401:
         return new AuthenticationError(context, body);
       default:
-        return new APIError(response.status, context, body);
+        return new APIError(status, context, body);
     }
   }
 }
 
 export class RateLimitError extends APIError {
-  constructor(context: string, body: string) {
+  /** Bucket snapshot at the moment the 429 was returned. Null if Keepa's body
+   *  didn't carry the usual rate-limit fields. */
+  readonly rateLimit: RateLimitInfo | null;
+
+  constructor(context: string, body: string, rateLimit: RateLimitInfo | null = null) {
     super(429, context, body, 'Keepa rate limit exceeded, please wait or upgrade plan');
     this.name = 'RateLimitError';
+    this.rateLimit = rateLimit;
   }
 }
 

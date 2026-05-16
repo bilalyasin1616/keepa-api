@@ -10,6 +10,7 @@ import type { KeepaImageRaw, KeepaProductRaw } from './product.raw.type.js';
 
 export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
   const amazon = parsePriceHistory(raw.csv?.[CsvType.AMAZON]);
+  const new_ = parsePriceHistory(raw.csv?.[CsvType.NEW]);
   const list = parsePriceHistory(raw.csv?.[CsvType.LISTPRICE]);
   return {
     asin: raw.asin,
@@ -23,10 +24,11 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     features: raw.features,
     images: rawImagesToUrls(raw.images),
     bsr: extractBsr(raw.salesRanks, raw.rootCategory),
-    price: amazon.at(-1)?.price ?? null,
+    amazonPrice: amazon.at(-1)?.price ?? null,
+    newPrice: new_.at(-1)?.price ?? null,
     listPrice: list.at(-1)?.price ?? null,
     history: {
-      price: { amazon, list },
+      price: { amazon, new: new_, list },
     },
   };
 }

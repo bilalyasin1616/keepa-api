@@ -79,4 +79,34 @@ describe('Keepa client', () => {
       expect(calledUrl).toContain('key=secret');
     });
   });
+
+  describe('rateLimit', () => {
+    it('starts null and is populated after the first response carrying bucket fields', async () => {
+      const fakeFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ tokensLeft: 180, refillIn: 8000, refillRate: 60 }),
+          { status: 200 },
+        ),
+      );
+      const client = new KeepaClient({ apiKey: 'k', fetch: fakeFetch });
+      expect(client.rateLimit).toBeNull();
+      await client._request({ path: '/ping', context: 'ping' });
+      expect(client.rateLimit?.tokensLeft).toBe(180);
+      expect(client.rateLimit?.refillIn).toBe(8000);
+    });
+
+    it('reflects the most-recent response when multiple requests resolve', async () => {
+      let tokens = 200;
+      const fakeFetch = vi.fn().mockImplementation(async () =>
+        new Response(
+          JSON.stringify({ tokensLeft: tokens--, refillIn: 1000, refillRate: 60 }),
+          { status: 200 },
+        ),
+      );
+      const client = new KeepaClient({ apiKey: 'k', fetch: fakeFetch });
+      await client._request({ path: '/ping', context: 'ping' });
+      await client._request({ path: '/ping', context: 'ping' });
+      expect(client.rateLimit?.tokensLeft).toBe(199);
+    });
+  });
 });

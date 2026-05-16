@@ -141,4 +141,57 @@ describe('request', () => {
       expect((err as NetworkError).message).toMatch(/REDACTED/);
     }
   });
+
+  it('fires onRateLimit with the bucket snapshot on a 200 response', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ tokensLeft: 240, refillIn: 12_345, refillRate: 60, products: [] }),
+        { status: 200 },
+      ),
+    );
+    const onRateLimit = vi.fn();
+    await request(
+      { ...base, fetch: fakeFetch, onRateLimit },
+      { path: '/product', context: 'product API' },
+    );
+    expect(onRateLimit).toHaveBeenCalledOnce();
+    const snapshot = onRateLimit.mock.calls[0]![0];
+    expect(snapshot.tokensLeft).toBe(240);
+    expect(snapshot.refillIn).toBe(12_345);
+    expect(snapshot.refillRate).toBe(60);
+  });
+
+  it('fires onRateLimit on a 429 and attaches the snapshot to RateLimitError', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ tokensLeft: 0, refillIn: 5_000, refillRate: 60, error: 'rate limited' }),
+        { status: 429 },
+      ),
+    );
+    const onRateLimit = vi.fn();
+    try {
+      await request(
+        { ...base, fetch: fakeFetch, onRateLimit },
+        { path: '/product', context: 'product API' },
+      );
+      throw new Error('expected to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(RateLimitError);
+      expect((err as RateLimitError).rateLimit?.tokensLeft).toBe(0);
+      expect((err as RateLimitError).rateLimit?.refillIn).toBe(5_000);
+      expect(onRateLimit).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('does not fire onRateLimit when the response body lacks Keepa bucket fields', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ products: [] }), { status: 200 }),
+    );
+    const onRateLimit = vi.fn();
+    await request(
+      { ...base, fetch: fakeFetch, onRateLimit },
+      { path: '/product', context: 'product API' },
+    );
+    expect(onRateLimit).not.toHaveBeenCalled();
+  });
 });

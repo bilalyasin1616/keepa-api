@@ -1,5 +1,6 @@
 import { request } from './core/request.js';
 import type { RequestArgs, RequestConfig } from './core/request.js';
+import type { RateLimitInfo } from './core/rate-limit.js';
 import { Products } from './resources/products/products.js';
 
 export interface ClientOptions {
@@ -17,6 +18,10 @@ export class KeepaClient {
   readonly fetch: typeof globalThis.fetch;
 
   readonly products: Products;
+
+  /** Latest rate-limit snapshot from Keepa, updated after every response.
+   *  Null until the first request completes. */
+  rateLimit: RateLimitInfo | null = null;
 
   constructor(options: ClientOptions = {}) {
     // `process` is undefined in browsers / Workers / edge runtimes — guard so the
@@ -43,6 +48,9 @@ export class KeepaClient {
       apiKey: this.apiKey,
       baseURL: this.baseURL,
       fetch: this.fetch,
+      onRateLimit: (info) => {
+        this.rateLimit = info;
+      },
     };
     return request<T>(config, args);
   }

@@ -8,6 +8,8 @@ export {
   NetworkError,
 } from './core/error.js';
 
+export type { RateLimitInfo } from './core/rate-limit.js';
+
 export { APIResource } from './core/resource.js';
 
 export {

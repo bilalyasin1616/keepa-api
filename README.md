@@ -1,50 +1,20 @@
 # keepa-api
 
-Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. Mirrors the organizational style of [openai-node](https://github.com/openai/openai-node) — a single `KeepaClient` class exposes resources (`products`, etc.) that wrap each endpoint with typed inputs and responses.
-
-Phase 1 ships the **Products** resource only. Categories, Search, and Bestsellers are planned but not yet implemented.
-
-## Requirements
-
-- Node.js **≥ 18** (uses native `fetch`)
-- A Keepa API key — sign up at [keepa.com/api](https://keepa.com/api.html)
-- ESM consumer (your `package.json` should have `"type": "module"`, or you must be able to `import()` an ESM package)
+Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. A single `KeepaClient` class exposes typed resources (currently `products`) with parsed responses, friendly currency units, and live rate-limit visibility.
 
 ## Installation
 
-This package is **not yet published to npm**. Install it locally or from GitHub.
-
-### From a local checkout (during development)
-
 ```bash
-# In keepa-api/
-npm install
-npm run build
-npm link
-
-# In your other project:
-npm link keepa-api
+npm install keepa-api
+# or
+pnpm add keepa-api
+# or
+yarn add keepa-api
+# or
+bun add keepa-api
 ```
 
-After this, edits in `keepa-api/src/` only need `npm run build` — the consumer sees the new `dist/` immediately.
-
-### From GitHub (no npm publish needed)
-
-```bash
-npm install github:bilalyasin1616/keepa-api#feature/keepa-products-package
-```
-
-(Replace the branch with `main` once the work is merged.)
-
-### From a tarball
-
-```bash
-# In keepa-api/
-npm pack          # produces keepa-api-0.1.0.tgz
-
-# In your other project:
-npm install /absolute/path/to/keepa-api-0.1.0.tgz
-```
+Requires Node 18+. Ships both ESM and CJS — works with `import` and `require`.
 
 ## Quickstart
 
@@ -53,19 +23,18 @@ import KeepaClient from 'keepa-api';
 
 const keepa = new KeepaClient({ apiKey: process.env.KEEPA_API_KEY });
 
-const products = await keepa.products.list({
-  asins: ['B00MNV8E0C'],
-  marketplace: 'US',
-});
+const [product] = await keepa.products.list({ asins: ['B00MNV8E0C'] });
 
-console.log(products[0]?.title);
+console.log(product?.title, product?.bsr, product?.images[0]);
 ```
 
-The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicitly. Put your key in a gitignored `.env` (see `.env.example` for the shape).
+`apiKey` falls back to `process.env.KEEPA_API_KEY` when omitted.
 
-## API
+## Client
 
-### `new KeepaClient(options?)`
+```ts
+new KeepaClient(options?)
+```
 
 | Option | Type | Default | Notes |
 |--------|------|---------|-------|
@@ -73,166 +42,167 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 | `baseURL` | `string` | `'https://api.keepa.com'` | Override for testing/proxying. |
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Plug in a custom fetch (mocks, retries, etc.). |
 
+## Products
+
 ### `keepa.products.list(params)` → `Promise<KeepaProduct[]>`
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
 | `asins` | `string[]` | (required) | Validated + uppercased. Throws on malformed input. |
-| `marketplace` | `'US' \| 'GB' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'BR'` | `'US'` | Case-insensitive. Throws on unknown. |
-| `days` | `number` | `1` | Days of price history to scope csv data when `history: true`. Must be a positive integer (validated pre-flight). |
-| `history` | `boolean` | `false` | When `true`, requests Keepa's csv history matrix and parses it into `product.history.price.{amazon,list}` (and the scalar `price`/`listPrice` counterparts) on each returned product. When `false`, those fields are empty/null. Affects token cost — leave off when you don't need it. |
+| `marketplace` | `Marketplace` | `'US'` | Case-insensitive. See [marketplaces](#marketplaces). |
+| `days` | `number` | `1` | Days of csv history when `history: true`. |
+| `history` | `boolean` | `false` | Populates `history.price.*` + scalar `amazonPrice` / `newPrice` / `listPrice`. Costs extra tokens. |
 
-The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
+### `keepa.products.retrieve(params)` → `Promise<KeepaProduct>`
 
-- `images: string[]` — full image URLs (region-neutral CDN). Replaces Keepa's awkward `imagesCSV` string.
-- `bsr: number | null` — most recent real BSR for the product's `rootCategory`. `null` when missing or every history entry is Keepa's `-1` "no data captured" sentinel.
-- `price: number | null` / `listPrice: number | null` — latest Amazon price and list price in the marketplace's **major unit** (dollars for US, pounds for GB, yen for JP, etc.). Derived from the last entry of `history.price.amazon` / `history.price.list`. `null` when `history: false` was used or Keepa has no data.
-- `history.price.amazon: PriceHistoryEntry[]` / `history.price.list: PriceHistoryEntry[]` — full parsed price series. Empty `[]` when `history: false` was used. Prices are in the marketplace's major unit (same as the scalar fields).
+Same options as `list`, but takes a single `asin: string` and returns one product. Throws `ProductNotFoundError` when Keepa has no record (stub with `title === null`, or no product returned at all).
 
-The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `features`, …) pass through unchanged.
+### `KeepaProduct`
 
-**Stub records:** Keepa returns one record per requested ASIN even when it has no data — these stubs have `title === null`. Filter with `isFoundProduct` (below).
+The SDK reshapes Keepa's wire format into something usable:
 
-### Price and price history
+| Field | Type | Notes |
+|-------|------|-------|
+| `images` | `string[]` | Full image URLs (region-neutral CDN). |
+| `bsr` | `number \| null` | Latest non-sentinel BSR for `rootCategory`. |
+| `amazonPrice` | `number \| null` | Latest price Amazon itself sells the product for (csv[0]) in the marketplace's **major unit** — dollars/pounds/yen/…. Null without `history: true`. |
+| `newPrice` | `number \| null` | Latest lowest-3rd-party-new offer price (csv[1]). Distinct from `amazonPrice` — Amazon isn't always the cheapest new seller. |
+| `listPrice` | `number \| null` | Latest list price / MSRP (csv[4]). |
+| `history.price.amazon` | `PriceHistoryEntry[]` | Amazon's own price over time. Empty without `history: true`. |
+| `history.price.new` | `PriceHistoryEntry[]` | Lowest-3rd-party-new price over time. |
+| `history.price.list` | `PriceHistoryEntry[]` | List price (MSRP) over time. |
 
-Every `KeepaProduct` has the price fields — what changes with the `history` flag is whether they're populated:
+`title`, `description`, `parentAsin`, `categoryTree`, `salesRanks`, `variations`, `features` pass through from Keepa unchanged.
 
-```ts
-// Default: history fields exist but are empty/null. Cheapest call.
-const [product] = await keepa.products.list({ asins: ['B00MNV8E0C'] });
-product.price;                    // null
-product.history.price.amazon;     // []
-
-// With history: arrays filled, scalar fields derive from the latest entry.
-const [detailed] = await keepa.products.list({
-  asins: ['B00MNV8E0C'],
-  history: true,
-  days: 30,
-});
-detailed.price;                   // 18.99 — latest Amazon price (USD dollars)
-detailed.listPrice;               // 29.99 — latest list price (USD dollars)
-detailed.history.price.amazon;    // PriceHistoryEntry[] — Amazon's own price over time (csv[0])
-detailed.history.price.list;      // PriceHistoryEntry[] — list price / MSRP over time (csv[4])
-```
-
-Each `PriceHistoryEntry` is `{ timestamp: Date, price: number }` where `price` is in the marketplace's major unit (dollars for `'US'`, pounds for `'GB'`, yen for `'JP'`, etc. — the consumer chose the marketplace, so the currency is known). Keepa's `-1` "no data captured" sentinel entries are filtered out, so iterating the arrays only yields real price points.
-
-If you need a csv type other than `CsvType.AMAZON` or `CsvType.LISTPRICE` (e.g. `CsvType.NEW`, `CsvType.USED`, `CsvType.REFURBISHED`, `CsvType.RATING`, …) — pull the row off the raw Keepa response and pass it through `parsePriceHistory`. The full 36-value mapping is exported as `CsvType` (matches Keepa's own enum names exactly).
-
-### Helpers
+**Stub records:** Keepa returns one entry per requested ASIN even for unknown ASINs — those stubs have `title === null`. Filter them out:
 
 ```ts
 import { isFoundProduct } from 'keepa-api';
 
-const real = products.filter(isFoundProduct);
-
-for (const product of real) {
-  console.log(product.bsr);          // already populated by the SDK
-  console.log(product.images[0]);    // already populated by the SDK
-}
+const found = products.filter(isFoundProduct);
 ```
 
-| Helper | Signature | Returns |
-|--------|-----------|---------|
-| `isFoundProduct(product)` | `(product: KeepaProduct) => boolean` | `true` only if Keepa returned real data (stubs have `title === null`). |
-| `extractBsr(salesRanks, rootCategory)` | `(salesRanks: Record<string, number[]> \| undefined, rootCategory: number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
-| `parsePriceHistory(series)` | `(series: number[] \| undefined) => PriceHistoryEntry[]` | Parse one row of Keepa's csv matrix (e.g. `csv[CsvType.AMAZON]`, `csv[CsvType.LISTPRICE]`) into `{ timestamp, price }` entries — `price` in the marketplace's major unit. `-1` sentinels filtered out. Used internally to fill `history.price.*`; exported so callers can parse other csv types via `CsvType`. |
-
-### ASIN validation
+### Price history
 
 ```ts
-import { ASIN_REGEX, ASIN_LENGTH, isValidAsin, normalizeAsins } from 'keepa-api';
+const [product] = await keepa.products.list({
+  asins: ['B00MNV8E0C'],
+  history: true,
+  days: 30,
+});
 
-isValidAsin('B00MNV8E0C');           // true
-isValidAsin('b00mnv8e0c');           // false (lowercase — use normalizeAsins to coerce)
-isValidAsin('B07XYZ');               // false (too short)
-
-normalizeAsins(['  b00mnv8e0c ']);   // ['B00MNV8E0C']
-normalizeAsins(['B07XYZ']);          // throws: Invalid ASIN(s): B07XYZ. ...
+product.amazonPrice;              // 18.99 (USD) — Amazon's own latest
+product.newPrice;                 // 16.99       — cheapest 3rd-party new
+product.listPrice;                // 29.99       — MSRP
+product.history.price.amazon[0];  // { timestamp: Date, price: 19.49 }
 ```
 
-`Products.list` calls `normalizeAsins` for you, so you don't need to pre-validate unless you're doing form-level checking.
+Prices are in the marketplace's major unit (USD dollars for `'US'`, GBP for `'GB'`, JPY for `'JP'`, …). Keepa's `-1` "no data captured" entries are filtered out.
 
-**Caveat:** The regex catches *malformed* input. It cannot catch "Keepa has no record" — for example `1234567890` is a structurally valid ISBN-10 shape and passes the regex, but Keepa returns a stub record. Use `isFoundProduct` to filter those.
-
-### Marketplaces
+For csv types beyond Amazon / list price (`NEW`, `USED`, `REFURBISHED`, `RATING`, …), pull the row off the raw response and parse it:
 
 ```ts
-import { MARKETPLACE_DOMAINS, resolveDomainId } from 'keepa-api';
+import { CsvType, parsePriceHistory } from 'keepa-api';
 
-MARKETPLACE_DOMAINS.US;   // 1
-resolveDomainId('gb');    // 2 (case-insensitive)
+const usedPrices = parsePriceHistory(rawProduct.csv?.[CsvType.USED]);
+```
+
+`CsvType` covers all 36 of Keepa's csv series names verbatim.
+
+## Marketplaces
+
+```ts
+import { resolveDomainId } from 'keepa-api';
+
+resolveDomainId('gb');      // 2 (case-insensitive)
 resolveDomainId(undefined); // 1 (defaults to US)
 ```
 
-| Code | Domain ID | Code | Domain ID |
-|------|-----------|------|-----------|
-| US   | 1         | IT   | 8         |
-| GB   | 2         | ES   | 9         |
-| DE   | 3         | IN   | 10        |
-| FR   | 4         | MX   | 11        |
-| JP   | 5         | BR   | 12        |
-| CA   | 6         |      |           |
+| Code | Domain | Code | Domain |
+|------|--------|------|--------|
+| US | 1 | IT | 8 |
+| GB | 2 | ES | 9 |
+| DE | 3 | IN | 10 |
+| FR | 4 | MX | 11 |
+| JP | 5 | BR | 12 |
+| CA | 6 |  |  |
 
-### Errors
+Codes are ISO 3166-1 alpha-2. Domain 7 is reserved (formerly Amazon China, retired by Keepa).
 
-All errors thrown by API calls extend `KeepaError`. Catch the specific subclasses for status-aware handling:
+## Rate limits
+
+The client tracks Keepa's token bucket on every response — success and 429 alike — and exposes the latest snapshot:
+
+```ts
+await keepa.products.list({ asins });
+
+if (keepa.rateLimit && keepa.rateLimit.tokensLeft < 50) {
+  await sleep(keepa.rateLimit.refillIn); // ms until next token refills
+}
+```
+
+On a 429, the snapshot is also attached to the thrown error:
+
+```ts
+import { RateLimitError } from 'keepa-api';
+
+try {
+  await keepa.products.list({ asins: bigBatch });
+} catch (err) {
+  if (err instanceof RateLimitError && err.rateLimit) {
+    await sleep(err.rateLimit.refillIn);
+    // retry…
+  }
+}
+```
+
+`RateLimitInfo`: `tokensLeft`, `refillIn` (ms), `refillRate` (tokens/min), `tokenFlowReduction`, `receivedAt`.
+
+The SDK does **not** auto-retry on 429. Handling that is your call.
+
+## Errors
+
+All errors extend `KeepaError`:
 
 ```ts
 import {
+  KeepaError,
+  APIError,
   RateLimitError,
   AuthenticationError,
-  APIError,
   NetworkError,
-  KeepaError,
 } from 'keepa-api';
 
 try {
-  await keepa.products.list({ asins: ['B00MNV8E0C'] });
+  await keepa.products.list({ asins });
 } catch (err) {
-  if (err instanceof RateLimitError) /* 429 */;
-  else if (err instanceof AuthenticationError) /* 401 — bad API key */;
-  else if (err instanceof APIError) /* 4xx/5xx — err.status, err.body */;
-  else if (err instanceof NetworkError) /* DNS/ECONNREFUSED/abort — err.cause has the original */;
-  else if (err instanceof KeepaError) /* something else from this SDK */;
+  if (err instanceof RateLimitError)           /* 429 — err.rateLimit */;
+  else if (err instanceof AuthenticationError) /* 401 — invalid API key */;
+  else if (err instanceof APIError)            /* 4xx/5xx — err.status, err.body */;
+  else if (err instanceof NetworkError)        /* transport — err.cause */;
   else throw err;
 }
 ```
 
-### API key handling
+## ASIN utilities
 
-Keepa's REST API requires the key as a `?key=...` query parameter — that's their contract, not a choice we made. Practical implications:
+```ts
+import { isValidAsin, normalizeAsins } from 'keepa-api';
 
-- **Server-side proxy / access logs** will record full URLs (key included). Configure log scrubbing if you can't trust the layer.
-- **Don't run this in the browser.** A client-side request would expose your key in DevTools' Network tab and to any browser extension or middlebox.
-- The `NetworkError.body` and `APIError.body` fields capture Keepa's response body. Keepa doesn't echo your key in error bodies, but if you log them to a customer-facing surface, sanity-check the contents first.
-
-## Scripts
-
-```bash
-npm test            # vitest run — unit tests
-npm run test:watch  # vitest watch
-npm run build       # tsc → dist/
-npm run example     # runs examples/basic.ts against real Keepa (needs .env)
-npm run clean       # rm -rf dist
+isValidAsin('B00MNV8E0C');           // true
+normalizeAsins(['  b00mnv8e0c ']);   // ['B00MNV8E0C']
+normalizeAsins(['B07XYZ']);          // throws — too short
 ```
 
-## Roadmap
+`products.list` / `products.retrieve` call `normalizeAsins` for you. The regex catches malformed ASINs but can't tell you whether Keepa has the record — use `isFoundProduct` for that.
 
-**Resources**
-- [ ] `Categories` resource (`fetchKeepaCategories`)
-- [ ] `Categories.search` (`searchKeepaCategories`)
-- [ ] `Bestsellers.retrieve` (`fetchKeepaBestSeller`)
+## Security note
 
-**Request layer**
-- [ ] `AbortSignal` / configurable timeout on `Products.list` (default ~30s) — currently a hung Keepa server keeps the request pending forever
-- [ ] Pass-through `init` (method, headers, signal) on `core/request` for resources that need POST or custom headers
-- [ ] Cap `asins.length` at Keepa's per-call limit (100) instead of letting Keepa silently truncate
-- [ ] Optional `retryOn429` (with backoff) — currently we throw `RateLimitError` immediately; consumers handle pacing in their own code
+Keepa's API authenticates via `?key=...` query parameter (not a header), so:
 
-**Distribution**
-- [ ] CommonJS build alongside ESM
-- [ ] Publish to npm
+- **Don't run this in a browser.** Your key would be visible in DevTools and to any browser extension or middlebox.
+- Server-side access logs will record full URLs (with key). Configure log scrubbing if the layer isn't trusted.
+- `APIError.body` and `NetworkError.message` are scrubbed of the key before being thrown.
 
 ## License
 

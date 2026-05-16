@@ -1,4 +1,5 @@
 import { APIError, NetworkError } from './error.js';
+import { extractRateLimit, type RateLimitInfo } from './rate-limit.js';
 
 export type QueryValue = string | number | string[] | number[] | undefined;
 export type QueryParams = Record<string, QueryValue>;
@@ -13,6 +14,9 @@ export interface RequestConfig {
   baseURL: string;
   apiKey: string;
   fetch: typeof globalThis.fetch;
+  /** Fired once per response (200 or 429) when Keepa's bucket fields are
+   *  present on the body. */
+  onRateLimit?: (info: RateLimitInfo) => void;
 }
 
 export function buildUrl(baseURL: string, path: string, query?: QueryParams): string {
@@ -41,6 +45,24 @@ export async function request<T>(config: RequestConfig, args: RequestArgs): Prom
   } catch (cause) {
     throw new NetworkError(args.context, cause);
   }
-  if (!res.ok) throw await APIError.from(res, args.context);
-  return (await res.json()) as T;
+
+  // Read the body once — Response bodies are single-use streams, and we need
+  // the same payload for both rate-limit extraction and (on errors) the body
+  // attached to the thrown error.
+  const text = await res.text().catch(() => '');
+  const body = safeJsonParse(text);
+
+  const rl = extractRateLimit(body);
+  if (rl) config.onRateLimit?.(rl);
+
+  if (!res.ok) throw APIError.from(res.status, args.context, text, rl);
+  return body as T;
+}
+
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }

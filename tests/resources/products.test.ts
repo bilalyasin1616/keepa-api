@@ -429,7 +429,7 @@ describe('Products.list — history mode', () => {
     expect(product?.history.price.list).toEqual([]);
   });
 
-  it('sets `price` / `listPrice` to the latest history entry when populated', async () => {
+  it('sets `amazonPrice`, `newPrice`, `listPrice` to the latest history entry when populated', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(
       jsonResponse({
         products: [
@@ -438,7 +438,7 @@ describe('Products.list — history mode', () => {
             title: 'Sample',
             csv: [
               [1_000_000, 1999, 2_000_000, 1899], // AMAZON — latest is 1899
-              null,
+              [1_100_000, 1799, 2_100_000, 1699], // NEW (3rd-party) — latest is 1699
               null,
               null,
               [1_500_000, 2999, 1_800_000, 2799], // LISTPRICE — latest is 2799
@@ -452,11 +452,12 @@ describe('Products.list — history mode', () => {
       asins: ['B07XYZ1234'],
       history: true,
     });
-    expect(product?.price).toBe(18.99);
+    expect(product?.amazonPrice).toBe(18.99);
+    expect(product?.newPrice).toBe(16.99);
     expect(product?.listPrice).toBe(27.99);
   });
 
-  it('`price` / `listPrice` are null when history is empty or csv is missing', async () => {
+  it('all scalar prices are null and history arrays empty when csv is missing', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(
       jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
     );
@@ -465,9 +466,11 @@ describe('Products.list — history mode', () => {
       asins: ['B07XYZ1234'],
       history: true,
     });
-    expect(product?.price).toBeNull();
+    expect(product?.amazonPrice).toBeNull();
+    expect(product?.newPrice).toBeNull();
     expect(product?.listPrice).toBeNull();
     expect(product?.history.price.amazon).toEqual([]);
+    expect(product?.history.price.new).toEqual([]);
     expect(product?.history.price.list).toEqual([]);
   });
 });
