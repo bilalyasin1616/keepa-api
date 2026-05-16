@@ -9,8 +9,8 @@ import type { KeepaProduct, PriceHistoryEntry } from './product.type.js';
 import type { KeepaImageRaw, KeepaProductRaw } from './product.raw.type.js';
 
 export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
-  const amazonPriceHistory = parsePriceHistory(raw.csv?.[CsvType.AMAZON]);
-  const listPriceHistory = parsePriceHistory(raw.csv?.[CsvType.LISTPRICE]);
+  const amazon = parsePriceHistory(raw.csv?.[CsvType.AMAZON]);
+  const list = parsePriceHistory(raw.csv?.[CsvType.LISTPRICE]);
   return {
     asin: raw.asin,
     title: raw.title,
@@ -23,10 +23,11 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     features: raw.features,
     images: rawImagesToUrls(raw.images),
     bsr: extractBsr(raw.salesRanks, raw.rootCategory),
-    amazonPriceHistory,
-    listPriceHistory,
-    price: amazonPriceHistory.at(-1)?.priceCents ?? null,
-    listPrice: listPriceHistory.at(-1)?.priceCents ?? null,
+    price: amazon.at(-1)?.price ?? null,
+    listPrice: list.at(-1)?.price ?? null,
+    history: {
+      price: { amazon, list },
+    },
   };
 }
 
@@ -53,10 +54,13 @@ function keepaMinutesToDate(minutes: number): Date {
   return new Date(minutes * 60_000 + KEEPA_EPOCH_UNIX_MS);
 }
 
+// Keepa stores prices as integers in the smallest unit (cents/pence/etc.) and
+// scales JPY/INR/BRL the same way, so /100 produces the marketplace's major unit
+// uniformly across all supported regions.
 export function parsePriceHistory(series: number[] | undefined): PriceHistoryEntry[] {
   return pairKeepaSeries(series).map(({ timestamp, value }) => ({
     timestamp: keepaMinutesToDate(timestamp),
-    priceCents: value,
+    price: value / 100,
   }));
 }
 

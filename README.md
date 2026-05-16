@@ -80,14 +80,14 @@ The client reads `process.env.KEEPA_API_KEY` if you don't pass `apiKey` explicit
 | `asins` | `string[]` | (required) | Validated + uppercased. Throws on malformed input. |
 | `marketplace` | `'US' \| 'GB' \| 'DE' \| 'FR' \| 'JP' \| 'CA' \| 'IT' \| 'ES' \| 'IN' \| 'MX' \| 'BR'` | `'US'` | Case-insensitive. Throws on unknown. |
 | `days` | `number` | `1` | Days of price history to scope csv data when `history: true`. Must be a positive integer (validated pre-flight). |
-| `history` | `boolean` | `false` | When `true`, requests Keepa's csv history matrix and parses it into the `amazonPriceHistory`/`listPriceHistory` arrays (and their scalar `price`/`listPrice` counterparts) on each returned product. When `false`, those fields are empty/null. Affects token cost — leave off when you don't need it. |
+| `history` | `boolean` | `false` | When `true`, requests Keepa's csv history matrix and parses it into `product.history.price.{amazon,list}` (and the scalar `price`/`listPrice` counterparts) on each returned product. When `false`, those fields are empty/null. Affects token cost — leave off when you don't need it. |
 
 The SDK maps Keepa's raw wire shape into a friendlier `KeepaProduct`:
 
 - `images: string[]` — full image URLs (region-neutral CDN). Replaces Keepa's awkward `imagesCSV` string.
 - `bsr: number | null` — most recent real BSR for the product's `rootCategory`. `null` when missing or every history entry is Keepa's `-1` "no data captured" sentinel.
-- `price: number | null` / `listPrice: number | null` — latest Amazon price and list price in the smallest currency unit (cents for USD). Derived from the last entry of `amazonPriceHistory` / `listPriceHistory`. `null` when `history: false` was used or Keepa has no data.
-- `amazonPriceHistory: PriceHistoryEntry[]` / `listPriceHistory: PriceHistoryEntry[]` — full parsed price series. Empty `[]` when `history: false` was used.
+- `price: number | null` / `listPrice: number | null` — latest Amazon price and list price in the marketplace's **major unit** (dollars for US, pounds for GB, yen for JP, etc.). Derived from the last entry of `history.price.amazon` / `history.price.list`. `null` when `history: false` was used or Keepa has no data.
+- `history.price.amazon: PriceHistoryEntry[]` / `history.price.list: PriceHistoryEntry[]` — full parsed price series. Empty `[]` when `history: false` was used. Prices are in the marketplace's major unit (same as the scalar fields).
 
 The raw `salesRanks` record is preserved for consumers that need to walk the full rank history. Other Keepa fields (`title`, `parentAsin`, `categoryTree`, `variations`, `features`, …) pass through unchanged.
 
@@ -100,8 +100,8 @@ Every `KeepaProduct` has the price fields — what changes with the `history` fl
 ```ts
 // Default: history fields exist but are empty/null. Cheapest call.
 const [product] = await keepa.products.list({ asins: ['B00MNV8E0C'] });
-product.price;              // null
-product.amazonPriceHistory; // []
+product.price;                    // null
+product.history.price.amazon;     // []
 
 // With history: arrays filled, scalar fields derive from the latest entry.
 const [detailed] = await keepa.products.list({
@@ -109,13 +109,13 @@ const [detailed] = await keepa.products.list({
   history: true,
   days: 30,
 });
-detailed.price;              // 1899 — latest Amazon price in cents
-detailed.listPrice;          // 2999 — latest list price (MSRP) in cents
-detailed.amazonPriceHistory; // PriceHistoryEntry[] — Amazon's own price over time (csv[0])
-detailed.listPriceHistory;   // PriceHistoryEntry[] — list price / MSRP over time (csv[4])
+detailed.price;                   // 18.99 — latest Amazon price (USD dollars)
+detailed.listPrice;               // 29.99 — latest list price (USD dollars)
+detailed.history.price.amazon;    // PriceHistoryEntry[] — Amazon's own price over time (csv[0])
+detailed.history.price.list;      // PriceHistoryEntry[] — list price / MSRP over time (csv[4])
 ```
 
-Each `PriceHistoryEntry` is `{ timestamp: Date, priceCents: number }`. Keepa's `-1` "no data captured" sentinel entries are filtered out, so iterating the arrays only yields real price points.
+Each `PriceHistoryEntry` is `{ timestamp: Date, price: number }` where `price` is in the marketplace's major unit (dollars for `'US'`, pounds for `'GB'`, yen for `'JP'`, etc. — the consumer chose the marketplace, so the currency is known). Keepa's `-1` "no data captured" sentinel entries are filtered out, so iterating the arrays only yields real price points.
 
 If you need a csv type other than `CsvType.AMAZON` or `CsvType.LISTPRICE` (e.g. `CsvType.NEW`, `CsvType.USED`, `CsvType.REFURBISHED`, `CsvType.RATING`, …) — pull the row off the raw Keepa response and pass it through `parsePriceHistory`. The full 36-value mapping is exported as `CsvType` (matches Keepa's own enum names exactly).
 
@@ -136,7 +136,7 @@ for (const product of real) {
 |--------|-----------|---------|
 | `isFoundProduct(product)` | `(product: KeepaProduct) => boolean` | `true` only if Keepa returned real data (stubs have `title === null`). |
 | `extractBsr(salesRanks, rootCategory)` | `(salesRanks: Record<string, number[]> \| undefined, rootCategory: number \| undefined) => number \| null` | Most recent real BSR from Keepa's raw `[ts, rank, ...]` history. Used internally to fill `bsr`; exported for advanced use. |
-| `parsePriceHistory(series)` | `(series: number[] \| undefined) => PriceHistoryEntry[]` | Parse one row of Keepa's csv matrix (e.g. `csv[CsvType.AMAZON]`, `csv[CsvType.LISTPRICE]`) into `{ timestamp, priceCents }` entries. `-1` sentinels filtered out. Used internally to fill `amazonPriceHistory` / `listPriceHistory`; exported so callers can parse other csv types via `CsvType`. |
+| `parsePriceHistory(series)` | `(series: number[] \| undefined) => PriceHistoryEntry[]` | Parse one row of Keepa's csv matrix (e.g. `csv[CsvType.AMAZON]`, `csv[CsvType.LISTPRICE]`) into `{ timestamp, price }` entries — `price` in the marketplace's major unit. `-1` sentinels filtered out. Used internally to fill `history.price.*`; exported so callers can parse other csv types via `CsvType`. |
 
 ### ASIN validation
 

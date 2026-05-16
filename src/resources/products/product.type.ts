@@ -5,8 +5,8 @@ export interface ProductRequestOptions {
   marketplace?: Marketplace;
   /** Defaults to 1. */
   days?: number;
-  /** When true, populates `amazonPriceHistory`, `listPriceHistory`, `price`,
-   *  and `listPrice` on each returned product. Increases token cost. */
+  /** When true, populates `history.price.*` and the scalar `price` / `listPrice`
+   *  fields on each returned product. Increases token cost. */
   history?: boolean;
 }
 
@@ -35,13 +35,13 @@ export interface KeepaVariation {
 
 export interface PriceHistoryEntry {
   timestamp: Date;
-  /** Smallest currency unit (cents for USD, pence for GBP, etc.). */
-  priceCents: number;
+  /** Marketplace's major unit — dollars for US, pounds for GB, yen for JP, etc. */
+  price: number;
 }
 
-/** Flag-gated fields (`amazonPriceHistory`, `listPriceHistory`, `price`,
- *  `listPrice`) are always present on the type and default to empty/null
- *  when the corresponding request flag wasn't set. */
+/** Flag-gated fields (`price`, `listPrice`, `history.price.*`) are always present
+ *  on the type and default to empty/null when the corresponding request flag
+ *  wasn't set. */
 export interface KeepaProduct {
   asin: string;
   title?: string;
@@ -58,16 +58,20 @@ export interface KeepaProduct {
   /** Null when missing or every history entry is Keepa's `-1` no-data sentinel. */
   bsr: number | null;
 
-  /** Latest entry from `amazonPriceHistory`; null when history wasn't requested
-   *  or Keepa has no data. */
+  /** Latest entry from `history.price.amazon`; null when history wasn't
+   *  requested or Keepa has no data. Marketplace's major unit. */
   price: number | null;
 
-  /** Latest entry from `listPriceHistory`; null when unavailable. */
+  /** Latest entry from `history.price.list`; null when unavailable.
+   *  Marketplace's major unit. */
   listPrice: number | null;
 
-  /** Empty when `history: false`. Sentinel-filtered. */
-  amazonPriceHistory: PriceHistoryEntry[];
-
-  /** Empty when `history: false`. Sentinel-filtered. */
-  listPriceHistory: PriceHistoryEntry[];
+  history: {
+    price: {
+      /** Empty when `history: false`. Sentinel-filtered. */
+      amazon: PriceHistoryEntry[];
+      /** Empty when `history: false`. Sentinel-filtered. */
+      list: PriceHistoryEntry[];
+    };
+  };
 }

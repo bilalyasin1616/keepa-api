@@ -382,7 +382,7 @@ describe('Products.list — history mode', () => {
     expect(fakeFetch.mock.calls[1]![0] as string).toContain('history=1');
   });
 
-  it('parses csv[0] into amazonPriceHistory and csv[4] into listPriceHistory', async () => {
+  it('parses csv[0] into history.price.amazon and csv[4] into history.price.list', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(
       jsonResponse({
         products: [
@@ -406,12 +406,12 @@ describe('Products.list — history mode', () => {
       history: true,
     });
 
-    expect(product?.amazonPriceHistory).toEqual([
-      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1999 },
-      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1899 },
+    expect(product?.history.price.amazon).toEqual([
+      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), price: 19.99 },
+      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), price: 18.99 },
     ]);
-    expect(product?.listPriceHistory).toEqual([
-      { timestamp: new Date(1_500_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 2999 },
+    expect(product?.history.price.list).toEqual([
+      { timestamp: new Date(1_500_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), price: 29.99 },
     ]);
   });
 
@@ -425,8 +425,8 @@ describe('Products.list — history mode', () => {
       history: true,
     });
 
-    expect(product?.amazonPriceHistory).toEqual([]);
-    expect(product?.listPriceHistory).toEqual([]);
+    expect(product?.history.price.amazon).toEqual([]);
+    expect(product?.history.price.list).toEqual([]);
   });
 
   it('sets `price` / `listPrice` to the latest history entry when populated', async () => {
@@ -452,8 +452,8 @@ describe('Products.list — history mode', () => {
       asins: ['B07XYZ1234'],
       history: true,
     });
-    expect(product?.price).toBe(1899);
-    expect(product?.listPrice).toBe(2799);
+    expect(product?.price).toBe(18.99);
+    expect(product?.listPrice).toBe(27.99);
   });
 
   it('`price` / `listPrice` are null when history is empty or csv is missing', async () => {
@@ -467,8 +467,8 @@ describe('Products.list — history mode', () => {
     });
     expect(product?.price).toBeNull();
     expect(product?.listPrice).toBeNull();
-    expect(product?.amazonPriceHistory).toEqual([]);
-    expect(product?.listPriceHistory).toEqual([]);
+    expect(product?.history.price.amazon).toEqual([]);
+    expect(product?.history.price.list).toEqual([]);
   });
 });
 
@@ -490,8 +490,8 @@ describe('Products.retrieve — history mode', () => {
       asin: 'B07XYZ1234',
       history: true,
     });
-    expect(product.amazonPriceHistory[0]?.priceCents).toBe(1999);
-    expect(product.listPriceHistory[0]?.priceCents).toBe(2999);
+    expect(product.history.price.amazon[0]?.price).toBe(19.99);
+    expect(product.history.price.list[0]?.price).toBe(29.99);
   });
 });
 
@@ -499,15 +499,15 @@ describe('parsePriceHistory', () => {
   it('converts [ts, price] pairs into PriceHistoryEntry objects', () => {
     const result = parsePriceHistory([1_000_000, 1999, 2_000_000, 1899]);
     expect(result).toEqual([
-      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1999 },
-      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1899 },
+      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), price: 19.99 },
+      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), price: 18.99 },
     ]);
   });
 
   it('filters out -1 "no data captured" sentinel entries', () => {
     const result = parsePriceHistory([1000, -1, 2000, 1999, 3000, -1]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.priceCents).toBe(1999);
+    expect(result[0]?.price).toBe(19.99);
   });
 
   it('returns [] for undefined, empty, or single-element series', () => {
@@ -519,6 +519,6 @@ describe('parsePriceHistory', () => {
   it('ignores a dangling element when the series has odd length', () => {
     const result = parsePriceHistory([1000, 1999, 2000]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.priceCents).toBe(1999);
+    expect(result[0]?.price).toBe(19.99);
   });
 });
