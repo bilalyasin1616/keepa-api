@@ -1,19 +1,21 @@
 export { Products } from './products.js';
-export { extractBsr, isFoundProduct } from './product.util.js';
+export { extractBsr, isFoundProduct, parsePriceHistory } from './product.util.js';
 export { ProductNotFoundError } from './error.js';
+export { CsvType } from './constant.js';
 
 export type {
+  ProductRequestOptions,
   ProductListParams,
   ProductRetrieveParams,
   KeepaProduct,
+  PriceHistoryEntry,
   KeepaVariation,
   KeepaVariationAttribute,
   KeepaCategoryNode,
 } from './product.type.js';
 
-// NOTE: raw Keepa wire types (KeepaProductRaw, KeepaProductResponseRaw) are
-// intentionally NOT re-exported. They are an implementation detail — Products.list
-// maps them to the consumer-friendly KeepaProduct shape before returning.
+// Raw wire types (KeepaProductRaw, KeepaProductResponseRaw) are intentionally
+// excluded — they're an implementation detail.
 
 export {
   PRODUCT_PATH,

@@ -4,7 +4,9 @@ import { Products } from '../../src/resources/products/products.js';
 import {
   extractBsr,
   isFoundProduct,
+  parsePriceHistory,
 } from '../../src/resources/products/product.util.js';
+import { KEEPA_EPOCH_UNIX_MS } from '../../src/resources/products/constant.js';
 import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
@@ -20,8 +22,6 @@ function makeClient(fetchImpl: typeof globalThis.fetch): KeepaClient {
 
 describe('Products.list', () => {
   it('builds the correct URL and returns processed products on success', async () => {
-    // Wire shape (what Keepa actually returns) — `images` is an array of
-    // {l, lH, lW, m, mH, mW} objects, no flat `images: string[]` or `bsr` field.
     const rawProduct = {
       asin: 'B07XYZ1234',
       title: 'Sample',
@@ -40,8 +40,6 @@ describe('Products.list', () => {
       marketplace: 'US',
     });
 
-    // Processed shape: the raw images[] objects are flattened to URL strings,
-    // bsr is derived from salesRanks.
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       asin: 'B07XYZ1234',
@@ -58,7 +56,7 @@ describe('Products.list', () => {
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toBe(
-      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1',
+      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1&history=0',
     );
   });
 
@@ -307,7 +305,6 @@ describe('extractBsr', () => {
     // [ts, rank, ts] — odd length. Naive `length-1` would point at the trailing
     // timestamp 9999 and return it as a rank. Correct behavior: skip it, return 50.
     expect(extractBsr({ '1': [1000, 50, 9999] }, 1)).toBe(50);
-    // [ts, rank, ts, rank, ts] — same shape, longer.
     expect(extractBsr({ '1': [1000, 50, 2000, 42, 9999] }, 1)).toBe(42);
     // Odd length with a single trailing ts and no real ranks before — null.
     expect(extractBsr({ '1': [1000] }, 1)).toBeNull();
@@ -370,5 +367,158 @@ describe('Products.list — image mapping (raw KeepaImageRaw[] → URL string[])
     expect(product?.images).toEqual([
       'https://m.media-amazon.com/images/I/good.jpg',
     ]);
+  });
+});
+
+describe('Products.list — history mode', () => {
+  it('sends history=0 by default and history=1 when enabled', async () => {
+    const fakeFetch = vi.fn().mockImplementation(async () => jsonResponse({ products: [] }));
+    const client = makeClient(fakeFetch);
+
+    await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(fakeFetch.mock.calls[0]![0] as string).toContain('history=0');
+
+    await client.products.list({ asins: ['B07XYZ1234'], history: true });
+    expect(fakeFetch.mock.calls[1]![0] as string).toContain('history=1');
+  });
+
+  it('parses csv[0] into amazonPriceHistory and csv[4] into listPriceHistory', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          {
+            asin: 'B07XYZ1234',
+            title: 'Sample',
+            csv: [
+              [1_000_000, 1999, 2_000_000, 1899], // csv[0] AMAZON
+              null,                                // csv[1] NEW (irrelevant)
+              null,                                // csv[2] USED (irrelevant)
+              null,                                // csv[3] SALES (irrelevant)
+              [1_500_000, 2999],                   // csv[4] LISTPRICE
+            ],
+          },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      history: true,
+    });
+
+    expect(product?.amazonPriceHistory).toEqual([
+      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1999 },
+      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1899 },
+    ]);
+    expect(product?.listPriceHistory).toEqual([
+      { timestamp: new Date(1_500_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 2999 },
+    ]);
+  });
+
+  it('returns empty history arrays when csv is missing or the index is empty', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      history: true,
+    });
+
+    expect(product?.amazonPriceHistory).toEqual([]);
+    expect(product?.listPriceHistory).toEqual([]);
+  });
+
+  it('sets `price` / `listPrice` to the latest history entry when populated', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          {
+            asin: 'B07XYZ1234',
+            title: 'Sample',
+            csv: [
+              [1_000_000, 1999, 2_000_000, 1899], // AMAZON — latest is 1899
+              null,
+              null,
+              null,
+              [1_500_000, 2999, 1_800_000, 2799], // LISTPRICE — latest is 2799
+            ],
+          },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      history: true,
+    });
+    expect(product?.price).toBe(1899);
+    expect(product?.listPrice).toBe(2799);
+  });
+
+  it('`price` / `listPrice` are null when history is empty or csv is missing', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      history: true,
+    });
+    expect(product?.price).toBeNull();
+    expect(product?.listPrice).toBeNull();
+    expect(product?.amazonPriceHistory).toEqual([]);
+    expect(product?.listPriceHistory).toEqual([]);
+  });
+});
+
+describe('Products.retrieve — history mode', () => {
+  it('populates the price-history fields on the single returned product', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          {
+            asin: 'B07XYZ1234',
+            title: 'Real',
+            csv: [[1_000_000, 1999], null, null, null, [1_500_000, 2999]],
+          },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const product: KeepaProduct = await client.products.retrieve({
+      asin: 'B07XYZ1234',
+      history: true,
+    });
+    expect(product.amazonPriceHistory[0]?.priceCents).toBe(1999);
+    expect(product.listPriceHistory[0]?.priceCents).toBe(2999);
+  });
+});
+
+describe('parsePriceHistory', () => {
+  it('converts [ts, price] pairs into PriceHistoryEntry objects', () => {
+    const result = parsePriceHistory([1_000_000, 1999, 2_000_000, 1899]);
+    expect(result).toEqual([
+      { timestamp: new Date(1_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1999 },
+      { timestamp: new Date(2_000_000 * 60_000 + KEEPA_EPOCH_UNIX_MS), priceCents: 1899 },
+    ]);
+  });
+
+  it('filters out -1 "no data captured" sentinel entries', () => {
+    const result = parsePriceHistory([1000, -1, 2000, 1999, 3000, -1]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.priceCents).toBe(1999);
+  });
+
+  it('returns [] for undefined, empty, or single-element series', () => {
+    expect(parsePriceHistory(undefined)).toEqual([]);
+    expect(parsePriceHistory([])).toEqual([]);
+    expect(parsePriceHistory([1000])).toEqual([]);
+  });
+
+  it('ignores a dangling element when the series has odd length', () => {
+    const result = parsePriceHistory([1000, 1999, 2000]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.priceCents).toBe(1999);
   });
 });

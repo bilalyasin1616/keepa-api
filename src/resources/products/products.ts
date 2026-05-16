@@ -34,14 +34,14 @@ export class Products extends APIResource {
         domain,
         asin: asins,
         days: params.days ?? DEFAULT_DAYS,
+        history: params.history ? 1 : 0,
       },
       context: PRODUCT_LIST_CONTEXT,
     });
     return (data.products ?? []).map(toKeepaProduct);
   }
 
-  /** Fetch a single product by ASIN. Throws `ProductNotFoundError` when Keepa
-   *  has no record for the ASIN (no product returned, or a stub with no title). */
+  /** Throws `ProductNotFoundError` when Keepa returns no product or a stub. */
   async retrieve(params: ProductRetrieveParams): Promise<KeepaProduct> {
     const { asin, ...rest } = params;
     const [product] = await this.list({ ...rest, asins: [asin] });

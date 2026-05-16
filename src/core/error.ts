@@ -1,7 +1,5 @@
-/** Replace any `?key=...` or `&key=...` segment with a REDACTED placeholder.
- *  Defense-in-depth: keeps the API key out of error messages even when an
- *  underlying transport error or upstream response echoes the request URL.
- *  Exported for use by callers that build their own error wrappers. */
+/** Defense-in-depth — keeps the API key out of error messages even when a
+ *  transport error or upstream response echoes the request URL back. */
 export function scrubApiKey(text: string): string {
   return text.replace(/([?&])key=[^&\s]*/gi, '$1key=REDACTED');
 }

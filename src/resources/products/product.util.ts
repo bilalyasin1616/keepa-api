@@ -1,13 +1,16 @@
 import {
   AMAZON_IMAGE_BASE,
+  CsvType,
+  KEEPA_EPOCH_UNIX_MS,
   KEEPA_NO_DATA_SENTINEL,
   VALID_IMAGE_FILENAME,
 } from './constant.js';
-import type { KeepaProduct } from './product.type.js';
+import type { KeepaProduct, PriceHistoryEntry } from './product.type.js';
 import type { KeepaImageRaw, KeepaProductRaw } from './product.raw.type.js';
 
-/** Map Keepa's raw wire shape into the consumer-friendly KeepaProduct. */
 export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
+  const amazonPriceHistory = parsePriceHistory(raw.csv?.[CsvType.AMAZON]);
+  const listPriceHistory = parsePriceHistory(raw.csv?.[CsvType.LISTPRICE]);
   return {
     asin: raw.asin,
     title: raw.title,
@@ -20,12 +23,45 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     features: raw.features,
     images: rawImagesToUrls(raw.images),
     bsr: extractBsr(raw.salesRanks, raw.rootCategory),
+    amazonPriceHistory,
+    listPriceHistory,
+    price: amazonPriceHistory.at(-1)?.priceCents ?? null,
+    listPrice: listPriceHistory.at(-1)?.priceCents ?? null,
   };
 }
 
-/** Convert Keepa's raw images array into full Amazon image URLs (the large
- *  variant). Filters entries whose filename doesn't match the expected
- *  alphanumeric image-name pattern as defense-in-depth. */
+interface KeepaSeriesPoint {
+  /** Keepa minutes — use `keepaMinutesToDate` for a JS Date. */
+  timestamp: number;
+  value: number;
+}
+
+// Pair up Keepa's flat `[ts, value, ts, value, ...]` series. Drops `-1` no-data
+// sentinels; the `i + 1 < length` bound silently skips a dangling odd element.
+function pairKeepaSeries(series: number[] | undefined): KeepaSeriesPoint[] {
+  if (!series) return [];
+  const points: KeepaSeriesPoint[] = [];
+  for (let i = 0; i + 1 < series.length; i += 2) {
+    const value = series[i + 1]!;
+    if (value === KEEPA_NO_DATA_SENTINEL) continue;
+    points.push({ timestamp: series[i]!, value });
+  }
+  return points;
+}
+
+function keepaMinutesToDate(minutes: number): Date {
+  return new Date(minutes * 60_000 + KEEPA_EPOCH_UNIX_MS);
+}
+
+export function parsePriceHistory(series: number[] | undefined): PriceHistoryEntry[] {
+  return pairKeepaSeries(series).map(({ timestamp, value }) => ({
+    timestamp: keepaMinutesToDate(timestamp),
+    priceCents: value,
+  }));
+}
+
+// Defense-in-depth — rejects path-traversal / SSRF-shaped filenames in case the
+// raw CSV is ever influenced by untrusted input.
 function rawImagesToUrls(images: KeepaImageRaw[] | undefined): string[] {
   if (!images || images.length === 0) return [];
   return images
@@ -33,32 +69,17 @@ function rawImagesToUrls(images: KeepaImageRaw[] | undefined): string[] {
     .map((img) => `${AMAZON_IMAGE_BASE}/${img.l}`);
 }
 
-/** Returns true when Keepa returned an actual product record (not just a stub
- *  for an unknown ASIN). Stubs come back with `title: null`; real listings
- *  always have a string. Use as a `.filter()` predicate to drop empty matches. */
+/** Stubs for unknown ASINs come back with `title: null`. */
 export function isFoundProduct(product: KeepaProduct): boolean {
   return product.title != null;
 }
 
-/** Extract the most recent real BSR from Keepa's `[ts, rank, ts, rank, ...]` salesRanks array.
- *  Walks backward through rank entries (odd indices) and skips Keepa's `-1` sentinel which
- *  marks "no data captured at that timestamp". Returns `null` if every entry is sentinel.
- *  Most consumers won't need this — `Products.list` already fills `bsr` on every returned
- *  product. Useful when working with a raw Keepa response. */
+/** Latest non-sentinel rank from Keepa's `[ts, rank, ts, rank, ...]` salesRanks
+ *  series for the product's rootCategory. */
 export function extractBsr(
   salesRanks: Record<string, number[]> | undefined,
   rootCategory: number | undefined,
 ): number | null {
   if (!salesRanks || rootCategory === undefined) return null;
-  const ranks = salesRanks[String(rootCategory)];
-  if (!ranks || ranks.length < 2) return null;
-  // Keepa pairs are [ts, rank, ts, rank, ...]. If length is even, the last index
-  // is a rank; if odd (truncated/schema drift), it's a dangling timestamp — skip
-  // back one slot so we always start on a rank.
-  const start = ranks.length % 2 === 0 ? ranks.length - 1 : ranks.length - 2;
-  for (let i = start; i >= 1; i -= 2) {
-    const rank = ranks[i];
-    if (rank !== undefined && rank !== KEEPA_NO_DATA_SENTINEL) return rank;
-  }
-  return null;
+  return pairKeepaSeries(salesRanks[String(rootCategory)]).at(-1)?.value ?? null;
 }

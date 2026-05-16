@@ -26,11 +26,8 @@ export function buildUrl(baseURL: string, path: string, query?: QueryParams): st
   return parts.length ? `${baseURL}${path}?${parts.join('&')}` : `${baseURL}${path}`;
 }
 
-// Keep commas literal — Keepa accepts comma-separated lists (asin=A,B,C, category=1,2,3)
-// and the category endpoint specifically rejects %2C-encoded commas.
-// Currently private to this module: if a future helper builds Keepa URLs outside
-// `request()` (e.g. a paginator) and needs the same encoding, lift this into
-// `core/encoding.ts` rather than duplicating it.
+// Keep commas literal — Keepa's category endpoint rejects %2C-encoded commas
+// in comma-separated lists (asin=A,B,C, category=1,2,3).
 function encodeKeepaValue(value: string): string {
   return encodeURIComponent(value).replace(/%2C/g, ',');
 }

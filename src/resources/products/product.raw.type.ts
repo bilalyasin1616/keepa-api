@@ -1,7 +1,5 @@
-// Internal: shapes Keepa actually returns over the wire. The Products resource maps
-// these into the consumer-friendly KeepaProduct (see product.type.ts) before returning,
-// so callers never have to deal with the awkward forms (e.g. comma-separated imagesCSV).
-// Not re-exported through resources/index.ts.
+// Internal wire shapes — not re-exported. Products maps these into the
+// consumer-friendly KeepaProduct (see product.type.ts) before returning.
 
 export interface KeepaCategoryNodeRaw {
   catId: number;
@@ -18,8 +16,6 @@ export interface KeepaVariationRaw {
   attributes?: KeepaVariationAttributeRaw[];
 }
 
-// Each image Keepa returns has a large variant (`l`/`lH`/`lW`) and a medium
-// variant (`m`/`mH`/`mW`). Filenames resolve under the Amazon image CDN.
 export interface KeepaImageRaw {
   l: string;
   lH: number;
@@ -40,6 +36,10 @@ export interface KeepaProductRaw {
   images?: KeepaImageRaw[];
   variations?: KeepaVariationRaw[];
   features?: string[];
+  // First dim is `CsvType`; second dim is `[ts, price, ts, price, ...]` where ts
+  // is in Keepa minutes and price is in the smallest-currency unit. Only sent
+  // when `history=1` was requested.
+  csv?: number[][];
 }
 
 export interface KeepaProductResponseRaw {

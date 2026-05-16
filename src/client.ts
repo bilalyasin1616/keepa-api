@@ -3,11 +3,9 @@ import type { RequestArgs, RequestConfig } from './core/request.js';
 import { Products } from './resources/products/products.js';
 
 export interface ClientOptions {
-  /** Keepa API key. Falls back to `process.env.KEEPA_API_KEY`. */
+  /** Falls back to `process.env.KEEPA_API_KEY` when omitted. */
   apiKey?: string;
-  /** Base URL for the Keepa API. Defaults to `https://api.keepa.com`. */
   baseURL?: string;
-  /** Custom fetch implementation. Defaults to `globalThis.fetch`. */
   fetch?: typeof globalThis.fetch;
 }
 
@@ -21,9 +19,8 @@ export class KeepaClient {
   readonly products: Products;
 
   constructor(options: ClientOptions = {}) {
-    // `process` is undefined in browsers / Cloudflare Workers / edge runtimes — guard it
-    // so the constructor throws our friendly "Missing Keepa API key" message instead of a
-    // raw ReferenceError on those targets.
+    // `process` is undefined in browsers / Workers / edge runtimes — guard so the
+    // constructor throws our friendly error instead of a raw ReferenceError there.
     const envApiKey =
       typeof process !== 'undefined' ? process.env?.KEEPA_API_KEY : undefined;
     const apiKey = options.apiKey || envApiKey;
@@ -33,17 +30,14 @@ export class KeepaClient {
       );
     }
     this.apiKey = apiKey;
-    // Strip a trailing slash so `${baseURL}${path}` never produces `//product`.
+    // Strip trailing slash so `${baseURL}${path}` never produces `//product`.
     this.baseURL = (options.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
-    // Bind `globalThis` once: an unbound reference to Node's fetch throws
-    // "Illegal invocation" when called with an undefined `this`. Bind once at
-    // construction so every _request call uses the cached bound function.
+    // Unbound Node fetch throws "Illegal invocation" when called with undefined `this`.
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
     this.products = new Products(this);
   }
 
-  /** Internal: used by APIResource subclasses to perform a request. */
   _request<T>(args: RequestArgs): Promise<T> {
     const config: RequestConfig = {
       apiKey: this.apiKey,

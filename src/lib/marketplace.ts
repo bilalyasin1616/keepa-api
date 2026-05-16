@@ -1,7 +1,5 @@
-// The full set of marketplaces Keepa currently supports. Codes are ISO 3166-1
-// alpha-2; the numeric id is Keepa's `domain` query parameter value. Domain 7
-// is reserved (formerly Amazon China, retired). Update the README marketplace
-// table alongside any change here.
+// Keys are ISO 3166-1 alpha-2; values are Keepa's `domain` query parameter.
+// Domain 7 is skipped — reserved (formerly Amazon China, retired).
 export const MARKETPLACE_DOMAINS = {
   US: 1,
   GB: 2,
