@@ -4,9 +4,11 @@ import { Products } from '../../src/resources/products/products.js';
 import {
   extractBsr,
   isFoundProduct,
+  parsePrice,
   parsePriceHistory,
+  parseSavingBasisType,
 } from '../../src/resources/products/product.util.js';
-import { KEEPA_EPOCH_UNIX_MS } from '../../src/resources/products/constant.js';
+import { KEEPA_EPOCH_UNIX_MS, SavingBasisType } from '../../src/resources/products/constant.js';
 import type { KeepaProduct } from '../../src/resources/products/product.type.js';
 import type { Marketplace } from '../../src/lib/marketplace.js';
 import { RateLimitError, AuthenticationError, APIError } from '../../src/core/error.js';
@@ -56,7 +58,7 @@ describe('Products.list', () => {
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toBe(
-      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1&history=0',
+      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1&history=0&stats=0',
     );
   });
 
@@ -313,7 +315,17 @@ describe('extractBsr', () => {
 
 describe('isFoundProduct', () => {
   function processedProduct(overrides: Partial<KeepaProduct>): KeepaProduct {
-    return { asin: 'B00MNV8E0C', images: [], bsr: null, ...overrides };
+    return {
+      asin: 'B00MNV8E0C',
+      images: [],
+      bsr: null,
+      amazonPrice: null,
+      newPrice: null,
+      listPrice: null,
+      history: { price: { amazon: [], new: [], list: [] } },
+      stats: { buyBoxSavingBasis: null, buyBoxSavingBasisType: null },
+      ...overrides,
+    };
   }
 
   it('true when the product has a title (Keepa returned real data)', () => {
@@ -475,6 +487,59 @@ describe('Products.list — history mode', () => {
   });
 });
 
+describe('Products.list — stats mode', () => {
+  it('sends stats=0 by default and stats=<days> when enabled', async () => {
+    const fakeFetch = vi.fn().mockImplementation(async () =>
+      jsonResponse({ products: [] }),
+    );
+    const client = makeClient(fakeFetch);
+
+    await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(fakeFetch.mock.calls[0]![0] as string).toContain('stats=0');
+
+    await client.products.list({ asins: ['B07XYZ1234'], stats: true, days: 30 });
+    expect(fakeFetch.mock.calls[1]![0] as string).toContain('stats=30');
+  });
+
+  it('parses buy-box saving basis (cents → major unit) and basis type', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          {
+            asin: 'B07XYZ1234',
+            title: 'Sample',
+            stats: { buyBoxSavingBasis: 2999, buyBoxSavingBasisType: 0 },
+          },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      stats: true,
+    });
+    expect(product?.stats.buyBoxSavingBasis).toBe(29.99);
+    expect(product?.stats.buyBoxSavingBasisType).toBe(SavingBasisType.LIST_PRICE);
+  });
+
+  it('stats fields are null when Keepa omits them or returns an out-of-range type', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', stats: { buyBoxSavingBasisType: 99 } },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      stats: true,
+    });
+    expect(product?.stats.buyBoxSavingBasis).toBeNull();
+    expect(product?.stats.buyBoxSavingBasisType).toBeNull();
+  });
+});
+
 describe('Products.retrieve — history mode', () => {
   it('populates the price-history fields on the single returned product', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(
@@ -523,5 +588,37 @@ describe('parsePriceHistory', () => {
     const result = parsePriceHistory([1000, 1999, 2000]);
     expect(result).toHaveLength(1);
     expect(result[0]?.price).toBe(19.99);
+  });
+});
+
+describe('parsePrice', () => {
+  it('divides a Keepa cents integer by 100', () => {
+    expect(parsePrice(1999)).toBe(19.99);
+    expect(parsePrice(0)).toBe(0);
+  });
+
+  it('returns null for missing, non-numeric, or non-finite values', () => {
+    expect(parsePrice(undefined)).toBeNull();
+    expect(parsePrice(null)).toBeNull();
+    expect(parsePrice('1999')).toBeNull();
+    expect(parsePrice(Number.NaN)).toBeNull();
+    expect(parsePrice(Number.POSITIVE_INFINITY)).toBeNull();
+  });
+
+  it('returns null for Keepa\'s -1 no-data sentinel', () => {
+    expect(parsePrice(-1)).toBeNull();
+  });
+});
+
+describe('parseSavingBasisType', () => {
+  it('returns the value when it matches a known SavingBasisType', () => {
+    expect(parseSavingBasisType(SavingBasisType.LIST_PRICE)).toBe(SavingBasisType.LIST_PRICE);
+    expect(parseSavingBasisType(SavingBasisType.WAS_PRICE)).toBe(SavingBasisType.WAS_PRICE);
+  });
+
+  it('returns null for missing or out-of-range values', () => {
+    expect(parseSavingBasisType(undefined)).toBeNull();
+    expect(parseSavingBasisType(99)).toBeNull();
+    expect(parseSavingBasisType('LIST_PRICE')).toBeNull();
   });
 });

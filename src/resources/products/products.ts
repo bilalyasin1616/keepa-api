@@ -35,6 +35,9 @@ export class Products extends APIResource {
         asin: asins,
         days: params.days ?? DEFAULT_DAYS,
         history: params.history ? 1 : 0,
+        // Keepa's `stats` parameter is the number of days to compute stats over;
+        // we pass `days` when the flag is on, 0 to disable.
+        stats: params.stats ? (params.days ?? DEFAULT_DAYS) : 0,
       },
       context: PRODUCT_LIST_CONTEXT,
     });

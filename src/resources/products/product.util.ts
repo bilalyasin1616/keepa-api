@@ -3,6 +3,7 @@ import {
   CsvType,
   KEEPA_EPOCH_UNIX_MS,
   KEEPA_NO_DATA_SENTINEL,
+  SavingBasisType,
   VALID_IMAGE_FILENAME,
 } from './constant.js';
 import type { KeepaProduct, PriceHistoryEntry } from './product.type.js';
@@ -30,7 +31,27 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     history: {
       price: { amazon, new: new_, list },
     },
+    stats: {
+      buyBoxSavingBasis: parsePrice(raw.stats?.buyBoxSavingBasis),
+      buyBoxSavingBasisType: parseSavingBasisType(raw.stats?.buyBoxSavingBasisType),
+    },
   };
+}
+
+/** Keepa's smallest-currency unit (cents/pence/…) → marketplace's major unit.
+ *  Keepa scales JPY/INR/BRL by 100 too, so /100 produces the right unit across
+ *  every supported region. Returns null for missing values, non-finite numbers,
+ *  and the `-1` no-data sentinel. */
+export function parsePrice(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value === KEEPA_NO_DATA_SENTINEL) return null;
+  return value / 100;
+}
+
+export function parseSavingBasisType(value: unknown): SavingBasisType | null {
+  return value === SavingBasisType.LIST_PRICE || value === SavingBasisType.WAS_PRICE
+    ? value
+    : null;
 }
 
 interface KeepaSeriesPoint {
@@ -56,14 +77,11 @@ function keepaMinutesToDate(minutes: number): Date {
   return new Date(minutes * 60_000 + KEEPA_EPOCH_UNIX_MS);
 }
 
-// Keepa stores prices as integers in the smallest unit (cents/pence/etc.) and
-// scales JPY/INR/BRL the same way, so /100 produces the marketplace's major unit
-// uniformly across all supported regions.
 export function parsePriceHistory(series: number[] | undefined): PriceHistoryEntry[] {
-  return pairKeepaSeries(series).map(({ timestamp, value }) => ({
-    timestamp: keepaMinutesToDate(timestamp),
-    price: value / 100,
-  }));
+  return pairKeepaSeries(series).flatMap(({ timestamp, value }) => {
+    const price = parsePrice(value);
+    return price === null ? [] : [{ timestamp: keepaMinutesToDate(timestamp), price }];
+  });
 }
 
 // Defense-in-depth — rejects path-traversal / SSRF-shaped filenames in case the

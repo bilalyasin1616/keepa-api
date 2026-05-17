@@ -1,7 +1,13 @@
 export { Products } from './products.js';
-export { extractBsr, isFoundProduct, parsePriceHistory } from './product.util.js';
+export {
+  extractBsr,
+  isFoundProduct,
+  parsePrice,
+  parsePriceHistory,
+  parseSavingBasisType,
+} from './product.util.js';
 export { ProductNotFoundError } from './error.js';
-export { CsvType } from './constant.js';
+export { CsvType, SavingBasisType } from './constant.js';
 
 export type {
   ProductRequestOptions,

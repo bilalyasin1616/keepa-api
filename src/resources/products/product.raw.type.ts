@@ -25,6 +25,13 @@ export interface KeepaImageRaw {
   mW: number;
 }
 
+export interface KeepaStatsRaw {
+  // Strikethrough-price reference; Keepa enum (0 = LIST_PRICE, 1 = WAS_PRICE).
+  buyBoxSavingBasisType?: number;
+  // In the smallest-currency unit (cents/pence/etc.).
+  buyBoxSavingBasis?: number;
+}
+
 export interface KeepaProductRaw {
   asin: string;
   title?: string;
@@ -40,6 +47,8 @@ export interface KeepaProductRaw {
   // is in Keepa minutes and price is in the smallest-currency unit. Only sent
   // when `history=1` was requested.
   csv?: number[][];
+  // Computed stats snapshot. Only sent when `stats=N` (N>0) was requested.
+  stats?: KeepaStatsRaw;
 }
 
 export interface KeepaProductResponseRaw {

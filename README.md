@@ -52,6 +52,7 @@ new KeepaClient(options?)
 | `marketplace` | `Marketplace` | `'US'` | Case-insensitive. See [marketplaces](#marketplaces). |
 | `days` | `number` | `1` | Days of csv history when `history: true`. |
 | `history` | `boolean` | `false` | Populates `history.price.*` + scalar `amazonPrice` / `newPrice` / `listPrice`. Costs extra tokens. |
+| `stats` | `boolean` | `false` | Populates the `stats` namespace (buy-box saving basis, etc.). Costs extra tokens. |
 
 ### `keepa.products.retrieve(params)` → `Promise<KeepaProduct>`
 
@@ -71,6 +72,8 @@ The SDK reshapes Keepa's wire format into something usable:
 | `history.price.amazon` | `PriceHistoryEntry[]` | Amazon's own price over time. Empty without `history: true`. |
 | `history.price.new` | `PriceHistoryEntry[]` | Lowest-3rd-party-new price over time. |
 | `history.price.list` | `PriceHistoryEntry[]` | List price (MSRP) over time. |
+| `stats.buyBoxSavingBasis` | `number \| null` | Buy box strikethrough reference price in the marketplace's major unit. Null without `stats: true` or when Keepa has no saving-basis data. |
+| `stats.buyBoxSavingBasisType` | `SavingBasisType \| null` | Reference type for the strikethrough — `SavingBasisType.LIST_PRICE` or `SavingBasisType.WAS_PRICE`. Null when unavailable. |
 
 `title`, `description`, `parentAsin`, `categoryTree`, `salesRanks`, `variations`, `features` pass through from Keepa unchanged.
 

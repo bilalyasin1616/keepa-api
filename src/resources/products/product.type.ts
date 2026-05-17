@@ -1,4 +1,5 @@
 import type { Marketplace } from '../../lib/marketplace.js';
+import type { SavingBasisType } from './constant.js';
 
 export interface ProductRequestOptions {
   /** Case-insensitive at runtime. Defaults to 'US'. */
@@ -8,6 +9,9 @@ export interface ProductRequestOptions {
   /** When true, populates `history.price.*` and the scalar `price` / `listPrice`
    *  fields on each returned product. Increases token cost. */
   history?: boolean;
+  /** When true, populates the `stats` namespace (buy-box saving basis, etc.).
+   *  Increases token cost. */
+  stats?: boolean;
 }
 
 export interface ProductListParams extends ProductRequestOptions {
@@ -79,5 +83,14 @@ export interface KeepaProduct {
       /** Empty when `history: false`. Sentinel-filtered. */
       list: PriceHistoryEntry[];
     };
+  };
+
+  stats: {
+    /** Buy box strikethrough reference price in the marketplace's major unit.
+     *  Null when `stats: false` was used or Keepa has no saving-basis data. */
+    buyBoxSavingBasis: number | null;
+    /** Reference type for the strikethrough price (`LIST_PRICE` or `WAS_PRICE`).
+     *  Null when unavailable. */
+    buyBoxSavingBasisType: SavingBasisType | null;
   };
 }

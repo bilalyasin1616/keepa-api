@@ -58,3 +58,9 @@ export const KEEPA_EPOCH_UNIX_MS = 1_293_840_000_000;
 // Defense-in-depth allowlist for filenames in imagesCSV — rejects path-traversal
 // / SSRF-shaped strings if the CSV is ever influenced by untrusted input.
 export const VALID_IMAGE_FILENAME = /^[A-Za-z0-9._-]+\.(jpg|jpeg|png|webp)$/i;
+
+export const SavingBasisType = {
+  LIST_PRICE: 0,
+  WAS_PRICE: 1,
+} as const;
+export type SavingBasisType = (typeof SavingBasisType)[keyof typeof SavingBasisType];
