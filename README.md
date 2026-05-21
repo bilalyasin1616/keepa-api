@@ -1,6 +1,6 @@
 # keepa-api
 
-Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. A single `KeepaClient` class exposes typed resources (`products`, `categories`, `bestSellers`, `search`) with parsed responses, friendly currency units, and live rate-limit visibility.
+Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. A single `KeepaClient` class exposes typed resources (`products`, `categories`, `bestSellers`) with parsed responses, friendly currency units, and live rate-limit visibility.
 
 ## Installation
 
@@ -146,6 +146,35 @@ cats[7141123011]?.parent;          // 1040660
 | `children` | `number[] \| null` | Direct children, or `null` for leaves. |
 | `productCount` | `number` | Active listings in the category. |
 
+### `keepa.categories.search(params)` → `Promise<CategorySearchHit[]>`
+
+Free-text search against Keepa's category index. Hits Keepa's `/search?type=category` endpoint — that endpoint is category-specific despite the generic-sounding path, so it lives here as a Categories method. Empty array on "no matches".
+
+```ts
+const hits = await keepa.categories.search({
+  term: 'yoga mat',
+  marketplace: 'GB',
+});
+
+hits[0]?.name;        // "Yoga Mats"
+hits[0]?.lowestRank;  // Lowest BSR of any product currently in this category
+```
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `term` | `string` | (required) | URL-encoded for you. |
+| `marketplace` | `Marketplace` | `'US'` | |
+
+### `CategorySearchHit`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `catId` | `number` | Amazon browse-node id. |
+| `name` | `string` | Leaf-only display name. |
+| `lowestRank` | `number` | Lowest BSR (= strongest top performer) in the category. |
+| `highestRank` | `number` | Highest BSR (= weakest top performer) in the category. |
+| `productCount` | `number` | Active listings. |
+
 ## Best sellers
 
 ### `keepa.bestSellers.retrieve(params)` → `Promise<KeepaBestSellerList \| null>`
@@ -173,37 +202,6 @@ list?.asinList[0]; // top bestseller ASIN
 |-------|------|-------|
 | `categoryId` | `number` | Echoed from Keepa, or the caller's id when Keepa omits it. |
 | `asinList` | `string[]` | Top-to-bottom ordered. May be empty when the response carried no list. |
-
-## Search
-
-### `keepa.search.categories(params)` → `Promise<KeepaCategorySearchResult[]>`
-
-Free-text search against Keepa's category index. Empty array on "no matches".
-
-```ts
-const cats = await keepa.search.categories({
-  term: 'yoga mat',
-  marketplace: 'GB',
-});
-
-cats[0]?.name;         // "Yoga Mats"
-cats[0]?.lowestRank;   // Lowest BSR of any product currently in this category
-```
-
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `term` | `string` | (required) | URL-encoded for you. |
-| `marketplace` | `Marketplace` | `'US'` | |
-
-### `KeepaCategorySearchResult`
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `catId` | `number` | Amazon browse-node id. |
-| `name` | `string` | Leaf-only display name. |
-| `lowestRank` | `number` | Lowest BSR (= strongest top performer) in the category. |
-| `highestRank` | `number` | Highest BSR (= weakest top performer) in the category. |
-| `productCount` | `number` | Active listings. |
 
 ## Marketplaces
 

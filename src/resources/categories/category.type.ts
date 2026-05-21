@@ -12,6 +12,14 @@ export interface CategoryListParams {
   withParents?: boolean;
 }
 
+export interface CategorySearchParams {
+  /** Free-text query (e.g. "dog hat", "yoga mat"). Keepa runs its own
+   *  category-name fuzzy match. */
+  term: string;
+  /** Case-insensitive at runtime. Defaults to 'US'. */
+  marketplace?: Marketplace;
+}
+
 export interface KeepaCategory {
   catId: number;
   /** Leaf-only name (e.g. "Coats, Jackets & Gilets"). Collides across
@@ -24,5 +32,16 @@ export interface KeepaCategory {
   children: number[] | null;
   /** Parent browse-node id. `0` marks a root category. */
   parent: number;
+  productCount: number;
+}
+
+export interface CategorySearchHit {
+  catId: number;
+  name: string;
+  /** Lowest BSR seen for any product currently in the category — a rough
+   *  proxy for "how competitive is this category at the top". */
+  lowestRank: number;
+  /** Highest BSR (i.e. weakest top performer) in the category. */
+  highestRank: number;
   productCount: number;
 }
