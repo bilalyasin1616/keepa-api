@@ -2,6 +2,7 @@ export { Products } from './products.js';
 export {
   extractBsr,
   isFoundProduct,
+  parseMonthlySold,
   parsePrice,
   parsePriceHistory,
   parseSavingBasisType,

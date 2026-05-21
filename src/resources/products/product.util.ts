@@ -28,6 +28,7 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     amazonPrice: amazon.at(-1)?.price ?? null,
     newPrice: new_.at(-1)?.price ?? null,
     listPrice: list.at(-1)?.price ?? null,
+    monthlySold: parseMonthlySold(raw.monthlySold),
     history: {
       price: { amazon, new: new_, list },
     },
@@ -46,6 +47,15 @@ export function parsePrice(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   if (value === KEEPA_NO_DATA_SENTINEL) return null;
   return value / 100;
+}
+
+/** Keepa returns `-1` when Amazon doesn't show the "bought in past month"
+ *  widget for the ASIN; surface that as null so callers can distinguish "no
+ *  data" from a genuine zero. */
+export function parseMonthlySold(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value === KEEPA_NO_DATA_SENTINEL) return null;
+  return value;
 }
 
 export function parseSavingBasisType(value: unknown): SavingBasisType | null {

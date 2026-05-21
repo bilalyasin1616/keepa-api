@@ -1,6 +1,6 @@
 # keepa-api
 
-Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. A single `KeepaClient` class exposes typed resources (currently `products`) with parsed responses, friendly currency units, and live rate-limit visibility.
+Lightweight TypeScript SDK for the [Keepa](https://keepa.com) REST API. A single `KeepaClient` class exposes typed resources (`products`, `categories`, `bestSellers`, `search`) with parsed responses, friendly currency units, and live rate-limit visibility.
 
 ## Installation
 
@@ -74,6 +74,7 @@ The SDK reshapes Keepa's wire format into something usable:
 | `history.price.list` | `PriceHistoryEntry[]` | List price (MSRP) over time. |
 | `stats.buyBoxSavingBasis` | `number \| null` | Buy box strikethrough reference price in the marketplace's major unit. Null without `stats: true` or when Keepa has no saving-basis data. |
 | `stats.buyBoxSavingBasisType` | `SavingBasisType \| null` | Reference type for the strikethrough — `SavingBasisType.LIST_PRICE` or `SavingBasisType.WAS_PRICE`. Null when unavailable. |
+| `monthlySold` | `number \| null` | Keepa's estimate from Amazon's "X+ bought in past month" widget. Null when Amazon doesn't show the widget for this ASIN — common for lower-velocity / non-US listings. A genuine zero surfaces as `0`. |
 
 `title`, `description`, `parentAsin`, `categoryTree`, `salesRanks`, `variations`, `features` pass through from Keepa unchanged.
 
@@ -111,6 +112,98 @@ const usedPrices = parsePriceHistory(rawProduct.csv?.[CsvType.USED]);
 ```
 
 `CsvType` covers all 36 of Keepa's csv series names verbatim.
+
+## Categories
+
+### `keepa.categories.list(params)` → `Promise<Record<number, KeepaCategory>>`
+
+Resolve category metadata by browse-node id. Returns a map keyed by `catId` for lookup; ids Keepa doesn't recognise are silently absent from the result.
+
+```ts
+const cats = await keepa.categories.list({
+  ids: [7141123011, 1040660],
+  marketplace: 'GB',
+});
+
+cats[7141123011]?.contextFreeName; // "Women's Coats, Jackets & Gilets"
+cats[7141123011]?.parent;          // 1040660
+```
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `ids` | `number[]` | (required) | Browse-node ids. Empty array → no HTTP call, returns `{}`. |
+| `marketplace` | `Marketplace` | `'US'` | |
+| `withParents` | `boolean` | `false` | Asks Keepa for ancestor records. Empirically the shape doesn't change for most categories — walk `categoryTree` on the product if you need a breadcrumb. |
+
+### `KeepaCategory`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `catId` | `number` | Amazon browse-node id. |
+| `name` | `string` | Leaf-only name (collides across departments). |
+| `contextFreeName` | `string \| undefined` | Pre-disambiguated label (e.g. "Women's Coats, Jackets & Gilets"). Missing on very old / experimental nodes — fall back to `name`. |
+| `parent` | `number` | Parent catId; `0` marks a root. |
+| `children` | `number[] \| null` | Direct children, or `null` for leaves. |
+| `productCount` | `number` | Active listings in the category. |
+
+## Best sellers
+
+### `keepa.bestSellers.retrieve(params)` → `Promise<KeepaBestSellerList \| null>`
+
+Returns `null` (not an error) when Keepa has no list for the category — typical for non-leaf nodes and sparse leaves.
+
+```ts
+const list = await keepa.bestSellers.retrieve({
+  categoryId: 7141123011,
+  marketplace: 'GB',
+});
+
+list?.asinList[0]; // top bestseller ASIN
+```
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `categoryId` | `number` | (required) | Browse-node id. |
+| `marketplace` | `Marketplace` | `'US'` | |
+| `sublist` | `boolean` | `true` | When true, Keepa returns the sub-category top list (shorter). |
+
+### `KeepaBestSellerList`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `categoryId` | `number` | Echoed from Keepa, or the caller's id when Keepa omits it. |
+| `asinList` | `string[]` | Top-to-bottom ordered. May be empty when the response carried no list. |
+
+## Search
+
+### `keepa.search.categories(params)` → `Promise<KeepaCategorySearchResult[]>`
+
+Free-text search against Keepa's category index. Empty array on "no matches".
+
+```ts
+const cats = await keepa.search.categories({
+  term: 'yoga mat',
+  marketplace: 'GB',
+});
+
+cats[0]?.name;         // "Yoga Mats"
+cats[0]?.lowestRank;   // Lowest BSR of any product currently in this category
+```
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `term` | `string` | (required) | URL-encoded for you. |
+| `marketplace` | `Marketplace` | `'US'` | |
+
+### `KeepaCategorySearchResult`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `catId` | `number` | Amazon browse-node id. |
+| `name` | `string` | Leaf-only display name. |
+| `lowestRank` | `number` | Lowest BSR (= strongest top performer) in the category. |
+| `highestRank` | `number` | Highest BSR (= weakest top performer) in the category. |
+| `productCount` | `number` | Active listings. |
 
 ## Marketplaces
 
