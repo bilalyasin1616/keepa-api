@@ -4,6 +4,7 @@ import { Products } from '../../src/resources/products/products.js';
 import {
   extractBsr,
   isFoundProduct,
+  parseMonthlySold,
   parsePrice,
   parsePriceHistory,
   parseSavingBasisType,
@@ -322,6 +323,7 @@ describe('isFoundProduct', () => {
       amazonPrice: null,
       newPrice: null,
       listPrice: null,
+      monthlySold: null,
       history: { price: { amazon: [], new: [], list: [] } },
       stats: { buyBoxSavingBasis: null, buyBoxSavingBasisType: null },
       ...overrides,
@@ -607,6 +609,75 @@ describe('parsePrice', () => {
 
   it('returns null for Keepa\'s -1 no-data sentinel', () => {
     expect(parsePrice(-1)).toBeNull();
+  });
+});
+
+describe('Products.list — monthlySold', () => {
+  it('passes Keepa monthlySold through as a positive integer', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', monthlySold: 1000 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.monthlySold).toBe(1000);
+  });
+
+  it("maps Keepa's -1 sentinel to null (widget not shown for ASIN)", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', monthlySold: -1 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.monthlySold).toBeNull();
+  });
+
+  it('returns null when the field is missing entirely', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.monthlySold).toBeNull();
+  });
+
+  it('preserves a genuine zero (distinct from -1 sentinel)', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', monthlySold: 0 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.monthlySold).toBe(0);
+  });
+});
+
+describe('parseMonthlySold', () => {
+  it('returns the value for positive integers and zero', () => {
+    expect(parseMonthlySold(1000)).toBe(1000);
+    expect(parseMonthlySold(0)).toBe(0);
+  });
+
+  it("returns null for Keepa's -1 no-data sentinel", () => {
+    expect(parseMonthlySold(-1)).toBeNull();
+  });
+
+  it('returns null for missing or non-numeric values', () => {
+    expect(parseMonthlySold(undefined)).toBeNull();
+    expect(parseMonthlySold(null)).toBeNull();
+    expect(parseMonthlySold('1000')).toBeNull();
+    expect(parseMonthlySold(Number.NaN)).toBeNull();
+    expect(parseMonthlySold(Number.POSITIVE_INFINITY)).toBeNull();
   });
 });
 

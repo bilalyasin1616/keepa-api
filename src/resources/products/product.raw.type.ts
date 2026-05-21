@@ -49,6 +49,10 @@ export interface KeepaProductRaw {
   csv?: number[][];
   // Computed stats snapshot. Only sent when `stats=N` (N>0) was requested.
   stats?: KeepaStatsRaw;
+  // Estimated monthly units sold (Amazon's "X+ bought in past month" widget).
+  // Keepa returns `-1` when the widget isn't shown for this ASIN — common
+  // for lower-velocity / non-US listings.
+  monthlySold?: number;
 }
 
 export interface KeepaProductResponseRaw {

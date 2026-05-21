@@ -74,6 +74,12 @@ export interface KeepaProduct {
   /** Latest list price / MSRP (csv[4]) in the marketplace's major unit. */
   listPrice: number | null;
 
+  /** Keepa's monthly-sold estimate from Amazon's "X+ bought in past month"
+   *  widget. Null when Amazon doesn't show the widget for this ASIN — common
+   *  for lower-velocity / non-US listings. Distinguishable from a genuine
+   *  zero, which surfaces as `0`. */
+  monthlySold: number | null;
+
   history: {
     price: {
       /** Empty when `history: false`. Sentinel-filtered. */

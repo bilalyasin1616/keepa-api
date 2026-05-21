@@ -2,6 +2,8 @@ import { request } from './core/request.js';
 import type { RequestArgs, RequestConfig } from './core/request.js';
 import type { RateLimitInfo } from './core/rate-limit.js';
 import { Products } from './resources/products/products.js';
+import { Categories } from './resources/categories/categories.js';
+import { BestSellers } from './resources/bestsellers/bestsellers.js';
 
 export interface ClientOptions {
   /** Falls back to `process.env.KEEPA_API_KEY` when omitted. */
@@ -18,6 +20,8 @@ export class KeepaClient {
   readonly fetch: typeof globalThis.fetch;
 
   readonly products: Products;
+  readonly categories: Categories;
+  readonly bestSellers: BestSellers;
 
   /** Latest rate-limit snapshot from Keepa, updated after every response.
    *  Null until the first request completes. */
@@ -41,6 +45,8 @@ export class KeepaClient {
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
     this.products = new Products(this);
+    this.categories = new Categories(this);
+    this.bestSellers = new BestSellers(this);
   }
 
   _request<T>(args: RequestArgs): Promise<T> {
