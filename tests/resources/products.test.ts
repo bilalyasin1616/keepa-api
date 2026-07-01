@@ -5,6 +5,7 @@ import {
   extractBsr,
   isFoundProduct,
   parseMonthlySold,
+  parseReferralFeePercent,
   parsePrice,
   parsePriceHistory,
   parseSavingBasisType,
@@ -324,6 +325,7 @@ describe('isFoundProduct', () => {
       newPrice: null,
       listPrice: null,
       monthlySold: null,
+      referralFeePercent: null,
       history: { price: { amazon: [], new: [], list: [] } },
       stats: { buyBoxSavingBasis: null, buyBoxSavingBasisType: null },
       ...overrides,
@@ -678,6 +680,75 @@ describe('parseMonthlySold', () => {
     expect(parseMonthlySold('1000')).toBeNull();
     expect(parseMonthlySold(Number.NaN)).toBeNull();
     expect(parseMonthlySold(Number.POSITIVE_INFINITY)).toBeNull();
+  });
+});
+
+describe('Products.list — referralFeePercent', () => {
+  it('passes Keepa referralFeePercent through as a percent', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', referralFeePercent: 15 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.referralFeePercent).toBe(15);
+  });
+
+  it("returns null for Keepa's -1 no-data sentinel", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', referralFeePercent: -1 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.referralFeePercent).toBeNull();
+  });
+
+  it('returns null when the field is missing entirely', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({ products: [{ asin: 'B07XYZ1234', title: 'Sample' }] }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.referralFeePercent).toBeNull();
+  });
+
+  it('preserves a genuine zero (distinct from -1 sentinel)', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', referralFeePercent: 0 },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(product?.referralFeePercent).toBe(0);
+  });
+});
+
+describe('parseReferralFeePercent', () => {
+  it('returns the value for positive numbers and zero', () => {
+    expect(parseReferralFeePercent(15)).toBe(15);
+    expect(parseReferralFeePercent(0)).toBe(0);
+  });
+
+  it("returns null for Keepa's -1 no-data sentinel", () => {
+    expect(parseReferralFeePercent(-1)).toBeNull();
+  });
+
+  it('returns null for missing or non-numeric values', () => {
+    expect(parseReferralFeePercent(undefined)).toBeNull();
+    expect(parseReferralFeePercent(null)).toBeNull();
+    expect(parseReferralFeePercent('15')).toBeNull();
+    expect(parseReferralFeePercent(Number.NaN)).toBeNull();
+    expect(parseReferralFeePercent(Number.POSITIVE_INFINITY)).toBeNull();
   });
 });
 

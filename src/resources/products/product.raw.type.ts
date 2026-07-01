@@ -53,6 +53,9 @@ export interface KeepaProductRaw {
   // Keepa returns `-1` when the widget isn't shown for this ASIN — common
   // for lower-velocity / non-US listings.
   monthlySold?: number;
+  // Amazon referral fee as a whole-number percent of the sale price. Keepa
+  // returns `-1` when unknown.
+  referralFeePercent?: number;
 }
 
 export interface KeepaProductResponseRaw {

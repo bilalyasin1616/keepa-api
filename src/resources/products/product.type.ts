@@ -80,6 +80,10 @@ export interface KeepaProduct {
    *  zero, which surfaces as `0`. */
   monthlySold: number | null;
 
+  /** Amazon referral fee as a whole-number percent of the sale price. Null when
+   *  Keepa has no data (its `-1` sentinel). */
+  referralFeePercent: number | null;
+
   history: {
     price: {
       /** Empty when `history: false`. Sentinel-filtered. */

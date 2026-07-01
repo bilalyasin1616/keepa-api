@@ -29,6 +29,7 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
     newPrice: new_.at(-1)?.price ?? null,
     listPrice: list.at(-1)?.price ?? null,
     monthlySold: parseMonthlySold(raw.monthlySold),
+    referralFeePercent: parseReferralFeePercent(raw.referralFeePercent),
     history: {
       price: { amazon, new: new_, list },
     },
@@ -53,6 +54,14 @@ export function parsePrice(value: unknown): number | null {
  *  widget for the ASIN; surface that as null so callers can distinguish "no
  *  data" from a genuine zero. */
 export function parseMonthlySold(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value === KEEPA_NO_DATA_SENTINEL) return null;
+  return value;
+}
+
+/** Keepa returns `-1` when the referral fee percent is unknown; surface that as
+ *  null so callers can distinguish "no data" from a genuine zero. */
+export function parseReferralFeePercent(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   if (value === KEEPA_NO_DATA_SENTINEL) return null;
   return value;
