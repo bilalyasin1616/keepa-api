@@ -30,6 +30,8 @@ export interface KeepaStatsRaw {
   buyBoxSavingBasisType?: number;
   // In the smallest-currency unit (cents/pence/etc.).
   buyBoxSavingBasis?: number;
+  // Current buy-box price in the smallest-currency unit; `-1` when no buy box.
+  buyBoxPrice?: number;
 }
 
 export interface KeepaProductRaw {

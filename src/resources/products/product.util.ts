@@ -34,6 +34,7 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
       price: { amazon, new: new_, list },
     },
     stats: {
+      buyBoxPrice: parsePrice(raw.stats?.buyBoxPrice),
       buyBoxSavingBasis: parsePrice(raw.stats?.buyBoxSavingBasis),
       buyBoxSavingBasisType: parseSavingBasisType(raw.stats?.buyBoxSavingBasisType),
     },

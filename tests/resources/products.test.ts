@@ -327,7 +327,7 @@ describe('isFoundProduct', () => {
       monthlySold: null,
       referralFeePercent: null,
       history: { price: { amazon: [], new: [], list: [] } },
-      stats: { buyBoxSavingBasis: null, buyBoxSavingBasisType: null },
+      stats: { buyBoxPrice: null, buyBoxSavingBasis: null, buyBoxSavingBasisType: null },
       ...overrides,
     };
   }
@@ -512,7 +512,7 @@ describe('Products.list — stats mode', () => {
           {
             asin: 'B07XYZ1234',
             title: 'Sample',
-            stats: { buyBoxSavingBasis: 2999, buyBoxSavingBasisType: 0 },
+            stats: { buyBoxPrice: 2499, buyBoxSavingBasis: 2999, buyBoxSavingBasisType: 0 },
           },
         ],
       }),
@@ -522,6 +522,7 @@ describe('Products.list — stats mode', () => {
       asins: ['B07XYZ1234'],
       stats: true,
     });
+    expect(product?.stats.buyBoxPrice).toBe(24.99);
     expect(product?.stats.buyBoxSavingBasis).toBe(29.99);
     expect(product?.stats.buyBoxSavingBasisType).toBe(SavingBasisType.LIST_PRICE);
   });
@@ -539,8 +540,25 @@ describe('Products.list — stats mode', () => {
       asins: ['B07XYZ1234'],
       stats: true,
     });
+    expect(product?.stats.buyBoxPrice).toBeNull();
     expect(product?.stats.buyBoxSavingBasis).toBeNull();
     expect(product?.stats.buyBoxSavingBasisType).toBeNull();
+  });
+
+  it('buyBoxPrice is null for the -1 no-buy-box sentinel', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        products: [
+          { asin: 'B07XYZ1234', title: 'Sample', stats: { buyBoxPrice: -1 } },
+        ],
+      }),
+    );
+    const client = makeClient(fakeFetch);
+    const [product] = await client.products.list({
+      asins: ['B07XYZ1234'],
+      stats: true,
+    });
+    expect(product?.stats.buyBoxPrice).toBeNull();
   });
 });
 

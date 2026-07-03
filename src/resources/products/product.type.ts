@@ -96,6 +96,9 @@ export interface KeepaProduct {
   };
 
   stats: {
+    /** Current buy box price in the marketplace's major unit. Null when
+     *  `stats: false` was used or there's no buy box (Keepa's `-1` sentinel). */
+    buyBoxPrice: number | null;
     /** Buy box strikethrough reference price in the marketplace's major unit.
      *  Null when `stats: false` was used or Keepa has no saving-basis data. */
     buyBoxSavingBasis: number | null;
