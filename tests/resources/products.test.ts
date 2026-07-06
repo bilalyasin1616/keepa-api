@@ -545,11 +545,11 @@ describe('Products.list — stats mode', () => {
     expect(product?.stats.buyBoxSavingBasisType).toBeNull();
   });
 
-  it('buyBoxPrice is null for the -1 no-buy-box sentinel', async () => {
+  it('buyBoxPrice is null for the -2 buy-box-present-but-price-unknown sentinel', async () => {
     const fakeFetch = vi.fn().mockResolvedValue(
       jsonResponse({
         products: [
-          { asin: 'B07XYZ1234', title: 'Sample', stats: { buyBoxPrice: -1 } },
+          { asin: 'B07XYZ1234', title: 'Sample', stats: { buyBoxPrice: -2 } },
         ],
       }),
     );
@@ -627,8 +627,9 @@ describe('parsePrice', () => {
     expect(parsePrice(Number.POSITIVE_INFINITY)).toBeNull();
   });
 
-  it('returns null for Keepa\'s -1 no-data sentinel', () => {
+  it('returns null for any negative sentinel (-1 no data, -2 buy box present but price unknown)', () => {
     expect(parsePrice(-1)).toBeNull();
+    expect(parsePrice(-2)).toBeNull();
   });
 });
 

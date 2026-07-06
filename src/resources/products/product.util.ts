@@ -44,10 +44,11 @@ export function toKeepaProduct(raw: KeepaProductRaw): KeepaProduct {
 /** Keepa's smallest-currency unit (cents/pence/…) → marketplace's major unit.
  *  Keepa scales JPY/INR/BRL by 100 too, so /100 produces the right unit across
  *  every supported region. Returns null for missing values, non-finite numbers,
- *  and the `-1` no-data sentinel. */
+ *  and any negative value — Keepa has no genuine negative prices, so `-1`
+ *  (no data) and `-2` (buy box present but price unknown) are both sentinels. */
 export function parsePrice(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-  if (value === KEEPA_NO_DATA_SENTINEL) return null;
+  if (value < 0) return null;
   return value / 100;
 }
 
