@@ -12,6 +12,10 @@ export interface ProductRequestOptions {
   /** When true, populates the `stats` namespace (buy-box saving basis, etc.).
    *  Increases token cost. */
   stats?: boolean;
+  /** When true, requests Keepa's buy-box data (`buybox=1`), which populates
+   *  `stats.buyBoxPrice`. Requires `stats: true` for the stats namespace to be
+   *  present at all. Increases token cost, billed separately from `stats`. */
+  buybox?: boolean;
 }
 
 export interface ProductListParams extends ProductRequestOptions {
@@ -96,8 +100,9 @@ export interface KeepaProduct {
   };
 
   stats: {
-    /** Current buy box price in the marketplace's major unit. Null when
-     *  `stats: false` was used or there's no buy box (Keepa's `-1` sentinel). */
+    /** Current buy box price in the marketplace's major unit. Null unless both
+     *  `stats: true` and `buybox: true` were requested, or when there's no buy
+     *  box (Keepa's negative sentinels). */
     buyBoxPrice: number | null;
     /** Buy box strikethrough reference price in the marketplace's major unit.
      *  Null when `stats: false` was used or Keepa has no saving-basis data. */

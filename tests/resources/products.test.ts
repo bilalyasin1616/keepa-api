@@ -60,7 +60,7 @@ describe('Products.list', () => {
     expect(fakeFetch).toHaveBeenCalledOnce();
     const url = fakeFetch.mock.calls[0]![0] as string;
     expect(url).toBe(
-      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1&history=0&stats=0',
+      'https://api.keepa.com/product?key=test-key&domain=1&asin=B07XYZ1234,B07ABC5678&days=1&history=0&stats=0&buybox=0',
     );
   });
 
@@ -503,6 +503,19 @@ describe('Products.list — stats mode', () => {
 
     await client.products.list({ asins: ['B07XYZ1234'], stats: true, days: 30 });
     expect(fakeFetch.mock.calls[1]![0] as string).toContain('stats=30');
+  });
+
+  it('sends buybox=0 by default and buybox=1 when enabled', async () => {
+    const fakeFetch = vi.fn().mockImplementation(async () =>
+      jsonResponse({ products: [] }),
+    );
+    const client = makeClient(fakeFetch);
+
+    await client.products.list({ asins: ['B07XYZ1234'] });
+    expect(fakeFetch.mock.calls[0]![0] as string).toContain('buybox=0');
+
+    await client.products.list({ asins: ['B07XYZ1234'], stats: true, buybox: true });
+    expect(fakeFetch.mock.calls[1]![0] as string).toContain('buybox=1');
   });
 
   it('parses buy-box saving basis (cents → major unit) and basis type', async () => {

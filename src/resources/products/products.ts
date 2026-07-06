@@ -38,6 +38,9 @@ export class Products extends APIResource {
         // Keepa's `stats` parameter is the number of days to compute stats over;
         // we pass `days` when the flag is on, 0 to disable.
         stats: params.stats ? (params.days ?? DEFAULT_DAYS) : 0,
+        // Keepa gates buy-box data (populates `stats.buyBoxPrice`) behind this;
+        // without it Keepa returns the `-2` "not requested" sentinel.
+        buybox: params.buybox ? 1 : 0,
       },
       context: PRODUCT_LIST_CONTEXT,
     });
